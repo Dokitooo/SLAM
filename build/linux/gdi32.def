@@ -1,0 +1,13 @@
+LIBRARY gdi32.dll
+EXPORTS
+    CreateCompatibleDC@4
+    CreateDIBSection@24
+    CreateFontA@56
+    DeleteDC@4
+    DeleteObject@4
+    GdiFlush@0
+    GetTextExtentPoint32A@16
+    SelectObject@8
+    SetBkMode@8
+    SetTextColor@8
+    TextOutA@20

@@ -1,0 +1,22 @@
+LIBRARY kernel32.dll
+EXPORTS
+    CloseHandle@4
+    CompareFileTime@8
+    CreateFileA@28
+    ExitProcess@4
+    FindClose@4
+    FindFirstFileA@8
+    FindNextFileA@8
+    GetCommandLineA@0
+    GetFileSize@8
+    GetModuleFileNameA@12
+    GetModuleHandleA@4
+    GetProcAddress@8
+    GlobalAlloc@8
+    GlobalFree@4
+    GlobalLock@4
+    GlobalUnlock@4
+    MulDiv@12
+    ReadFile@20
+    VirtualAlloc@16
+    VirtualFree@12

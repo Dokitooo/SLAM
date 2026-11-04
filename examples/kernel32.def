@@ -1,0 +1,17 @@
+LIBRARY kernel32.dll
+EXPORTS
+    CloseHandle@4
+    CreateFileMappingA@24
+    CreateThread@24
+    DisableThreadLibraryCalls@4
+    GetCurrentProcessId@0
+    GetLastError@0
+    GetModuleHandleA@4
+    GetPrivateProfileIntA@16
+    GetPrivateProfileStringA@24
+    GetProcAddress@8
+    GetTickCount@0
+    LoadLibraryA@4
+    MapViewOfFile@20
+    OpenFileMappingA@12
+    Sleep@4

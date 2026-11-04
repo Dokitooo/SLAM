@@ -1,0 +1,1 @@
+MinHook by Tsuda Kageyu, https://github.com/TsudaKageyu/minhook, commit 8af6b4a, unmodified. BSD-2-Clause (LICENSE.txt).
