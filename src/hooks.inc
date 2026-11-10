@@ -135,7 +135,7 @@ static int chain_add(HookTarget *t, SlamMod *m, void *detour, void **original)
         t->off = 0;
     }
     for (o = n->link; o; o = o->link)
-        if (o->live) {
+        if (o->live && o->owner != &g_core) {      /* SLAM's own links (file trail) are not worth a line */
             if (t->iat) slog("hooks: %s (import of nba2k14.exe) is hooked by %s and %s - chained, %s runs first", t->what, owner_name(m), owner_name(o->owner), owner_name(m));
             else slog("hooks: %08X is hooked by %s and %s - chained, %s runs first", (u32)t->target, owner_name(m), owner_name(o->owner), owner_name(m));
             break;

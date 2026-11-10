@@ -18,3 +18,18 @@
 - Shared hooks on the game's imported functions (`api->hook_import`), e.g. `CreateFileA`, so mods that
   follow the same file calls (BodyHook, SigExt) chain instead of overwriting each other.
 - Recognises the NBA 2K12 builds BodyHook supports (log, crash reports, game-ready detection).
+- Crash reports that look further:
+  - **File trail:** SLAM remembers every game file the game opens (`.iff .ros .fra .cmg .rda .bik .dat`):
+    first/last time, which thread, how often. Crash reports list them newest first (the crashing
+    thread's files marked) and in a `[files]` block. `[Crash] FileTrail=1` in `SLAM.ini` (0 = off).
+    SLAM's link on `CreateFileA` is the innermost one, so mods that redirect file names still chain in
+    front of it and the trail shows the file that was really opened.
+  - **The crash window checks the files:** edited with RED MC, or changed after the game was installed
+    (newer than the date most of the game's `.iff` files have). Listed most recently changed first. A
+    crash in the game's own code now names the most recently changed file as the first suspect.
+  - **The crash window reads every mod's log** (`SLAM\*.log`, `SLAM\<Mod>\*.log` written this session):
+    problem lines (error, failed, warning, ...) of the last 3 minutes before the crash are shown with
+    the cause; if nothing else points anywhere, the mod that logged the problem is named. The last
+    lines of each log written in the last 10 minutes are added to the report.
+  - Probe / research builds of mods still installed are pointed out.
+  - The findings are added to the end of the report once (`[findings]` block), so mod authors get them.

@@ -3,6 +3,8 @@
  *   SLAMCrash.exe "<SLAM\crash\crash_....log>"   show that report
  *   SLAMCrash.exe                                show the newest report in <this folder>\crash\
  *
+ * First (1.1) it adds what it finds on disk to the report, once (findings.inc): changed game files the
+ * game loaded, problem lines and last lines of the mods' logs, probe builds still installed.
  * Top: the likely cause in plain words (from the report's [facts] block, see cause.inc) and who
  * to send it to. Below: the whole report. Buttons: Copy report, Open crash folder, Close.
  * It is a separate program because a crashed game can't be trusted to draw a window.
@@ -20,8 +22,9 @@
 static char g_path[MAX_PATH];
 static char *g_report;                   /* whole file, \r\n line ends */
 static CauseFacts g_fx;
+static CauseExtra g_cx;
 static CauseResult g_cause;
-static char g_causeText[4600];           /* headline + body, for the copy button and the edit */
+static char g_causeText[7600];           /* headline + body, for the copy button and the edit */
 static HWND g_wnd, g_head, g_causeEdit, g_who, g_label, g_log, g_btn[3];
 static HFONT g_fUi, g_fBold, g_fMono;
 static int g_dpi = 96;
@@ -35,6 +38,7 @@ void *__cdecl memcpy(void *d, const void *s, size_t n) { unsigned char *p = (uns
 
 static int px(int v) { return MulDiv(v, g_dpi, 96); }
 static void s_cpy(char *d, const char *s, int cap) { int i = 0; for (; s[i] && i < cap - 1; i++) d[i] = s[i]; d[i] = 0; }
+#include "findings.inc"
 
 /* ---- the report file -------------------------------------------------------------------------- */
 static char *read_text(const char *path)
@@ -248,8 +252,13 @@ void __stdcall start(void)
         MessageBoxA(NULL, m, "SLAM crash report", MB_OK | MB_ICONERROR);
         ExitProcess(1);
     }
+    if (add_findings(g_path, g_report)) {              /* changed files + mod logs, added to the report once */
+        char *again = read_text(g_path);
+        if (again) { VirtualFree(g_report, 0, MEM_RELEASE); g_report = again; }
+    }
     cause_parse(g_report, &g_fx);
-    cause_guess(&g_fx, &g_cause);
+    cause_extra(g_report, &g_cx);
+    cause_guess(&g_fx, &g_cx, &g_cause);
     g_test = (int)fact_u(&g_fx, "test");
     build_cause_text();
     make_fonts();

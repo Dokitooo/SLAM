@@ -54,6 +54,7 @@ EXPORTS
     ResumeThread@4
     RtlCaptureContext@4
     SetThreadContext@8
+    SetLastError@4
     SetUnhandledExceptionFilter@4
     Sleep@4
     SuspendThread@4

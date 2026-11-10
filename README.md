@@ -113,6 +113,7 @@ LogExceptions=1  ; note smaller errors the game survives in SLAM.log
 TestKey=Ctrl+F11 ; test key: test report + crash window (any combination, e.g. Alt+T; 0 = off)
 TestCloses=0     ; 1 = the test really closes the game, like a crash
 Keep=20          ; crash reports kept in SLAM\crash\
+FileTrail=1      ; remember which game files (.iff .ros ...) the game opened, for the crash report
 
 [Overlay]
 Show=1           ; list of loaded mods at the top left when the game starts
@@ -145,6 +146,20 @@ A window opens with:
   you can try;
 - **who to send it to** (the mod's author);
 - **the full report**, with buttons to copy it or open the crash folder.
+
+The crash window also looks around before it shows the cause:
+
+- **Changed game files.** SLAM remembers every game file the game opened (`.iff`, `.ros`, ...).
+  The window checks them on disk: files edited with RED MC and files changed after the game was
+  installed are listed, **most recently changed first**. When the crash is in the game's own code,
+  the file you changed last is named as the first suspect, even when the crash happens while the
+  game is loading a different file (a file the game can't use often makes it fail later).
+- **Every mod's log.** All `.log` files in `SLAM\` and `SLAM\<Mod>\` written this session: lines
+  that report a problem (error, failed, warning, ...) in the last 3 minutes before the crash are
+  shown with the cause, and the last lines of each log are added to the report.
+- **Probe / research builds** of mods that are still installed.
+
+All of it is added to the end of the report (once), so the mod author sees it too.
 
 Reports are saved in `SLAM\crash\` (`crash_<date>_<time>.log` + `.dmp`). Send both files to the
 mod author. You can open an old report again by starting `SLAM\SLAMCrash.exe`, or by dragging a

@@ -4,6 +4,12 @@
  * (tools/test_cause). Rules are checked from most to least specific; the first rule that fits
  * gives the headline, later rules may add "also" lines.
  *
+ * Since 1.1 the report can also hold a [findings] block, added by SLAMCrash.exe when it opens the
+ * report: the changed game files the game loaded this session (RED MC-edited, or changed after the
+ * game was installed), recent problem lines from the mods' logs, and probe/test builds of mods.
+ * cause_extra() reads it; cause_guess() uses it when it is there (it may be missing: older report,
+ * SLAMCrash.exe not run, FileTrail=0).
+ *
  * Output (cause_guess):
  *     sure        2 = likely, 1 = possible, 0 = unclear
  *     headline    one short sentence
@@ -15,7 +21,7 @@
 
 typedef struct { char key[40]; char val[600]; } CauseFact;
 typedef struct { CauseFact f[CAUSE_MAX_FACTS]; int n; } CauseFacts;
-typedef struct { int sure; char headline[300]; char body[4000]; char blame[300]; } CauseResult;
+typedef struct { int sure; char headline[300]; char body[7000]; char blame[300]; } CauseResult;
 
 /* ---- tiny string helpers (no CRT) ---- */
 static int  c_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
@@ -60,6 +66,65 @@ static const char *fact(const CauseFacts *fx, const char *key)
 }
 static unsigned fact_u(const CauseFacts *fx, const char *key) { return c_dec(fact(fx, key)); }
 static unsigned fact_x(const CauseFacts *fx, const char *key) { return c_hex(fact(fx, key)); }
+
+/* ---- [findings] (SLAMCrash.exe) ---- */
+#define CX_FILES 48
+#define CX_LOGS 16
+typedef struct { unsigned ageS; int redmc, changed, missing, crashThread; char when[24]; char path[180]; } CxFile;
+typedef struct { char mod[64]; unsigned ageS; char text[200]; } CxLog;
+typedef struct { CxFile f[CX_FILES]; int nf; CxLog l[CX_LOGS]; int nl; char probes[300]; int have; } CauseExtra;
+
+/* copy field k (0-based, '|'-separated) of the line p..e; the last field takes the rest of the line */
+static void cx_field(const char *p, const char *e, int k, int last, char *out, int cap)
+{
+    int n = 0;
+    while (k && p < e) { if (*p == '|') k--; p++; }
+    while (p < e && (last || *p != '|') && n < cap - 1) out[n++] = *p++;
+    out[n] = 0;
+}
+static void cause_extra(const char *text, CauseExtra *cx)
+{
+    const char *p = text; int in = 0;
+    cx->nf = cx->nl = cx->have = 0; cx->probes[0] = 0;
+    while (*p) {
+        const char *e = p; int n;
+        while (*e && *e != '\n' && *e != '\r') e++;
+        n = (int)(e - p);
+        if (n == 10 && c_istarts(p, "[findings]")) { in = 1; cx->have = 1; }
+        else if (n == 11 && c_istarts(p, "[/findings]")) break;
+        else if (in && n > 5) {
+            char t[24];
+            if (c_istarts(p, "file|") && cx->nf < CX_FILES) {
+                CxFile *f = &cx->f[cx->nf++]; char fl[16]; int i;
+                cx_field(p, e, 1, 0, t, sizeof(t)); f->ageS = c_dec(t);
+                cx_field(p, e, 2, 0, fl, sizeof(fl));
+                f->redmc = f->changed = f->missing = f->crashThread = 0;
+                for (i = 0; fl[i]; i++) { if (fl[i] == 'R') f->redmc = 1; if (fl[i] == 'C') f->changed = 1; if (fl[i] == 'M') f->missing = 1; if (fl[i] == 'T') f->crashThread = 1; }
+                cx_field(p, e, 3, 0, f->when, sizeof(f->when));
+                cx_field(p, e, 4, 1, f->path, sizeof(f->path));
+            } else if (c_istarts(p, "log|") && cx->nl < CX_LOGS) {
+                CxLog *l = &cx->l[cx->nl++];
+                cx_field(p, e, 1, 0, l->mod, sizeof(l->mod));
+                cx_field(p, e, 2, 0, t, sizeof(t)); l->ageS = c_dec(t);
+                cx_field(p, e, 3, 1, l->text, sizeof(l->text));
+            } else if (c_istarts(p, "probe|")) {
+                char m[80]; cx_field(p, e, 1, 1, m, sizeof(m));
+                if (cx->probes[0]) c_cat(cx->probes, ",", sizeof(cx->probes));
+                c_cat(cx->probes, m, sizeof(cx->probes));
+            }
+        }
+        while (*e == '\r' || *e == '\n') e++;
+        p = e;
+    }
+}
+static const char *c_basename(const char *p) { const char *b = p; for (; *p; p++) if (*p == '\\' || *p == '/') b = p + 1; return b; }
+static void c_age(char *out, unsigned s)          /* "12 s" / "3 min" / "2 h" */
+{
+    char n[12];
+    if (s < 120) { c_utoa(n, s); c_cat(out, n, 40); c_cat(out, " s", 40); }
+    else if (s < 7200) { c_utoa(n, s / 60); c_cat(out, n, 40); c_cat(out, " min", 40); }
+    else { c_utoa(n, s / 3600); c_cat(out, n, 40); c_cat(out, " h", 40); }
+}
 
 /* "A,B,C" -> "A, B and C" */
 static void c_nice_list(char *out, const char *list, int cap)
@@ -128,8 +193,26 @@ static void head(CauseResult *r, int sure, const char *s1, const char *s2, const
 }
 static void blame(CauseResult *r, const char *list) { if (!r->blame[0]) c_cat(r->blame, list, sizeof(r->blame)); }
 
-static void cause_guess(const CauseFacts *fx, CauseResult *r)
+/* the changed files (most recently changed first), as bullet lines */
+static void cx_file_lines(CauseResult *r, const CauseExtra *cx, int max)
 {
+    int i; char t[400], a[40];
+    for (i = 0; i < cx->nf && i < max; i++) {
+        const CxFile *f = &cx->f[i];
+        t[0] = 0; a[0] = 0; c_age(a, f->ageS);
+        c_cat(t, c_basename(f->path), sizeof(t));
+        c_cat(t, f->redmc ? " - edited with RED MC" : "", sizeof(t));
+        if (f->changed && f->when[0]) { c_cat(t, f->redmc ? ", changed " : " - changed ", sizeof(t)); c_cat(t, f->when, sizeof(t)); }
+        c_cat(t, ", last loaded ", sizeof(t)); c_cat(t, a, sizeof(t)); c_cat(t, " before the crash", sizeof(t));
+        if (f->crashThread) c_cat(t, " (by the thread that crashed)", sizeof(t));
+        tip(r, t);
+    }
+    if (cx->nf > max) { char n[12]; c_utoa(n, (unsigned)(cx->nf - max)); c_cat(r->body, "  - ... and ", sizeof(r->body)); say(r, n); say(r, " more (see the end of the report)\r\n"); }
+}
+
+static void cause_guess(const CauseFacts *fx, const CauseExtra *cx, CauseResult *r)
+{
+    static const CauseExtra none;
     const char *mod = fact(fx, "module"), *modMod = fact(fx, "module_mod"), *kind = fact(fx, "kind");
     const char *nearEip = fact(fx, "hooked_near_eip"), *stackMods = fact(fx, "stack_mods"), *nearStack = fact(fx, "hooked_near_stack");
     const char *access = fact(fx, "access"), *notes = fact(fx, "notes");
@@ -144,7 +227,8 @@ static void cause_guess(const CauseFacts *fx, CauseResult *r)
     int nullPtr = access[0] && target < 0x10000;
     int lowMem = (bigMb && bigMb < 64) || (lowMb && lowMb < 32) || code == 0xC0000017u;
     char t[700], note[200];
-    int i;
+    int i, filesShown = 0;
+    if (!cx) cx = &none;
 
     r->sure = 0; r->headline[0] = 0; r->body[0] = 0; r->blame[0] = 0;
 
@@ -305,6 +389,18 @@ static void cause_guess(const CauseFacts *fx, CauseResult *r)
             tip(r, "Remove recently added .asi/.dll mods to test.");
             goto extras;
         }
+        if (cx->nf) {
+            head(r, 1, "The game crashed in its own code - most likely because of a changed game file.", 0, 0);
+            say(r, "No mod's code was running");
+            if (nullPtr) { say(r, "; the game tried to "); say(r, access[0] == 'w' ? "write to" : "read"); say(r, " an empty (null) pointer"); }
+            say(r, "." NL "These game files are not the originals and were loaded this session (most recently changed first):" NL);
+            cx_file_lines(r, cx, 6); filesShown = 1;
+            say(r, "Start with the file you changed most recently, even if the crash seems to happen somewhere" NL
+                   "else: a file the game can't use often makes it fail later, while it loads something else." NL NL "What you can try:" NL);
+            tip(r, "Put the original of the first file back and do the same thing again (same teams, same arena).");
+            tip(r, "If it still crashes, do the same with the next file on the list.");
+            goto extras;
+        }
         if (nullPtr) {
             head(r, 1, "The game used data that wasn't there.", 0, 0);
             say(r, "It tried to ");
@@ -341,6 +437,34 @@ static void cause_guess(const CauseFacts *fx, CauseResult *r)
     tip(r, "Send this report to the author of the mod you suspect.");
 
 extras:
+    if (cx->nf && !filesShown) {
+        say(r, NL "Also: these game files are not the originals and were loaded this session (most recently changed first):" NL);
+        cx_file_lines(r, cx, 4);
+    }
+    if (cx->nl) {
+        int k, who = -1, sameMod = 1;                   /* the one mod (not SLAM) that logged problems */
+        for (k = 0; k < cx->nl; k++) if (!c_ieq(cx->l[k].mod, "SLAM")) {
+            if (who < 0) who = k; else if (!c_ieq(cx->l[k].mod, cx->l[who].mod)) sameMod = 0;
+        }
+        if (r->sure == 0 && who >= 0 && sameMod) {      /* nothing else to go on: the mod that complained */
+            char h[200]; h[0] = 0;
+            c_cat(h, cx->l[who].mod, sizeof(h)); c_cat(h, " reported a problem in its log just before the crash.", sizeof(h));
+            r->sure = 1; r->headline[0] = 0; c_cat(r->headline, h, sizeof(r->headline));
+            blame(r, cx->l[who].mod);
+        }
+        say(r, NL "Also: problems the mods wrote to their logs shortly before the crash:" NL);
+        for (k = 0; k < cx->nl && k < 4; k++) {
+            char a[40], line[400]; a[0] = 0; line[0] = 0; c_age(a, cx->l[k].ageS);
+            c_cat(line, cx->l[k].mod, sizeof(line)); c_cat(line, " (", sizeof(line)); c_cat(line, a, sizeof(line));
+            c_cat(line, " before): ", sizeof(line)); c_cat(line, cx->l[k].text, sizeof(line));
+            tip(r, line);
+        }
+    }
+    if (cx->probes[0]) {
+        c_nice_list(t, cx->probes, sizeof(t));
+        say(r, NL "Also: "); say(r, t);
+        say(r, " is a probe/research build (it only collects information). Remove it when you are not testing." NL);
+    }
     if (conflicts) {
         char n[12]; c_utoa(n, conflicts);
         say(r, NL "Also: SLAM found "); say(r, n);

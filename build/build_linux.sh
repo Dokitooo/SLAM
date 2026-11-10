@@ -9,7 +9,7 @@
 set -e
 export PATH="/usr/lib/llvm-18/bin:$PATH"
 cd "$(dirname "$0")/.."
-: "${MGW:=/home/dev/ext/mgw0/mingw-w64-headers}"; : "${GEN:=/home/dev/ext/gen}"
+: "${MGW:?set MGW to the mingw-w64-headers folder}"; : "${GEN:?set GEN to the folder with the generated _mingw.h}"
 OBJ=build/obj; OUT=bin; mkdir -p $OBJ $OUT
 INC="-imsvc $GEN -imsvc $MGW/crt -imsvc $MGW/include -imsvc $MGW/defaults/include"
 CF="--target=i686-pc-windows-msvc /c /O2 /GS- /Gs999999 /Zl /W3 -D_X86_ -fgnuc-version=4.2.1 $INC"

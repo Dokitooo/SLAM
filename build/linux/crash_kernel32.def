@@ -4,11 +4,14 @@ EXPORTS
     CompareFileTime@8
     CreateFileA@28
     ExitProcess@4
+    FileTimeToLocalFileTime@8
+    FileTimeToSystemTime@8
     FindClose@4
     FindFirstFileA@8
     FindNextFileA@8
     GetCommandLineA@0
     GetFileSize@8
+    GetFileTime@16
     GetModuleFileNameA@12
     GetModuleHandleA@4
     GetProcAddress@8
@@ -18,5 +21,8 @@ EXPORTS
     GlobalUnlock@4
     MulDiv@12
     ReadFile@20
+    SetFilePointer@16
+    SetFileTime@16
     VirtualAlloc@16
     VirtualFree@12
+    WriteFile@20

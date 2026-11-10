@@ -110,6 +110,8 @@ static const char kDefaultIni[] =
     "TestCloses=0\r\n"
     "; how many crash reports to keep in SLAM\\crash\\\r\n"
     "Keep=20\r\n"
+    "; 1 = remember which game files (.iff .ros ...) the game opened, for the crash report\r\n"
+    "FileTrail=1\r\n"
     "\r\n"
     "[Overlay]\r\n"
     "; 1 = show the list of loaded mods at the top left when the game starts\r\n"
@@ -132,6 +134,7 @@ static void config_load(void)
         if (f != INVALID_HANDLE_VALUE) { DWORD w; WriteFile(f, kDefaultIni, sizeof(kDefaultIni) - 1, &w, NULL); CloseHandle(f); }
     }
     /* an SLAM.ini from an older SLAM: add settings it doesn't have yet (existing values stay) */
+    ini_add("Crash", "FileTrail", "1");
     ini_add("Overlay", "Show", "1"); ini_add("Overlay", "Seconds", "3");
     ini_add("Crash", "TestKey", "Ctrl+F11"); ini_add("Crash", "TestCloses", "0");
     GetPrivateProfileStringA("Mods", "LoadFirst", "", g_cfgLoadFirst, sizeof(g_cfgLoadFirst), g_iniPath);

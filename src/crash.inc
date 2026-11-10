@@ -44,6 +44,7 @@ static int g_crTestCloses;                 /* TestCloses=0  1 = the test really 
 static volatile LONG g_crRealTest;
 static char g_crTestName[32] = "Ctrl+F11";
 static int g_crKeep = 20;                  /* Keep=20       reports kept in SLAM\crash\     */
+static int g_crFileTrail = 1;              /* FileTrail=1   remember which game files were opened (for the report) */
 
 static void crash_config(const char *ini)
 {
@@ -77,13 +78,89 @@ static void crash_config(const char *ini)
     g_crTestCloses = GetPrivateProfileIntA("Crash", "TestCloses", 0, ini);
     g_crKeep    = GetPrivateProfileIntA("Crash", "Keep", 20, ini);
     if (g_crKeep < 1) g_crKeep = 1;
+    g_crFileTrail = GetPrivateProfileIntA("Crash", "FileTrail", 1, ini);
+}
+
+static volatile LONG g_crashOnce;          /* a report is being / was written */
+
+/* ---- file trail: which game files (.iff .ros ...) the game opened, and when ---------------------
+ * SLAM puts the innermost link on the game's CreateFileA import (mods that redirect file names chain
+ * in front of it, so this sees the file that is really opened). One entry per file name: first and
+ * last time it was opened, by which thread, how often. Static table, no heap; a crash report reads
+ * it without the lock. Cost: a short name check per CreateFileA call. */
+#define FT_MAX 1024
+#define FT_PATH 180
+typedef struct { u32 hash, first, last, tid, opens; int ok; char path[FT_PATH]; } FtEntry;
+static FtEntry g_ft[FT_MAX];
+static volatile LONG g_ftN, g_ftLock, g_ftLost;
+typedef HANDLE (WINAPI *CFA_t)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+static CFA_t g_ftNext;
+
+static int ft_wanted(const char *p, int n)
+{
+    static const char *ext[] = { ".iff", ".ros", ".fra", ".cmg", ".rda", ".bik", ".dat", 0 };
+    int i, k;
+    if (n < 5) return 0;
+    for (i = 0; ext[i]; i++) {
+        for (k = 0; k < 4 && s_lc(p[n - 4 + k]) == ext[i][k]; k++) ;
+        if (k == 4) return 1;
+    }
+    return 0;
+}
+static void ft_note(const char *name, int ok)
+{
+    u32 h = 2166136261u, now = GetTickCount(), tid = GetCurrentThreadId(); int n = 0, i, spin;
+    const char *p = name;
+    if (s_len(g_gameDir) && !memcmp_i(name, g_gameDir, s_len(g_gameDir))) p = name + s_len(g_gameDir);   /* shorter: below the game folder */
+    while (p[0] == '.' && (p[1] == '\\' || p[1] == '/')) p += 2;
+    for (; p[n] && n < 400; n++) h = (h ^ (u8)s_lc(p[n])) * 16777619u;
+    if (!ft_wanted(p, n)) return;
+    for (spin = 0; InterlockedCompareExchange(&g_ftLock, 1, 0); spin++) { if (spin > 2000) { InterlockedIncrement(&g_ftLost); return; } Sleep(0); }
+    for (i = 0; i < g_ftN; i++)                                  /* long paths: compare what was kept of them */
+        if (g_ft[i].hash == h && !memcmp_i(g_ft[i].path, p, n < FT_PATH - 1 ? n : FT_PATH - 1) && (n >= FT_PATH - 1 || !g_ft[i].path[n])) break;
+    if (i == g_ftN) {
+        if (g_ftN < FT_MAX) { g_ft[i].hash = h; g_ft[i].first = now; g_ft[i].opens = 0; s_cpy(g_ft[i].path, p, FT_PATH); g_ftN++; }
+        else { InterlockedIncrement(&g_ftLost); InterlockedExchange(&g_ftLock, 0); return; }
+    }
+    g_ft[i].last = now; g_ft[i].tid = tid; g_ft[i].opens++; g_ft[i].ok = ok;
+    InterlockedExchange(&g_ftLock, 0);
+}
+static HANDLE WINAPI ft_CreateFileA(LPCSTR name, DWORD acc, DWORD share, LPSECURITY_ATTRIBUTES sa, DWORD disp, DWORD flags, HANDLE tmpl)
+{
+    HANDLE r = g_ftNext(name, acc, share, sa, disp, flags, tmpl);
+    if (name && !g_crashOnce) {
+        DWORD e = GetLastError();
+        if (r != INVALID_HANDLE_VALUE || mem_readable(name, 1)) ft_note(name, r != INVALID_HANDLE_VALUE);   /* a bad name pointer: leave it */
+        SetLastError(e);
+    }
+    return r;
+}
+static void ft_install(void)
+{
+    int r;
+    if (!g_crFileTrail) { slog("crash report: file trail off (SLAM.ini [Crash] FileTrail=0)"); return; }
+    r = hook_import(&g_core, "KERNEL32.dll", "CreateFileA", (void *)ft_CreateFileA, (void **)&g_ftNext);
+    if (r != SLAM_OK) slog("crash report: file trail not available (import hook: %d)", r);
+    else slog("crash report: file trail on - crash reports list the game files (.iff .ros ...) opened this session");
+}
+/* newest first: indexes into g_ft (crash time: no lock, the table only grows) */
+static int g_ftOrder[FT_MAX], g_ftSorted;
+static int ft_sorted(void)
+{
+    int n = g_ftN < FT_MAX ? g_ftN : FT_MAX, i, j;
+    g_ftSorted = n;
+    for (i = 0; i < n; i++) {
+        int k = i; u32 t = g_ft[i].last;
+        for (j = i; j > 0 && (u32)(t - g_ft[g_ftOrder[j - 1]].last) < 0x80000000u && t != g_ft[g_ftOrder[j - 1]].last; j--) g_ftOrder[j] = g_ftOrder[j - 1];
+        g_ftOrder[j] = k;
+    }
+    return n;
 }
 
 /* ---- state ----------------------------------------------------------------------------------- */
 typedef BOOL (WINAPI *MiniDump_t)(HANDLE, DWORD, HANDLE, DWORD, void *, void *, void *);
 static MiniDump_t g_miniDump;
 static LPTOP_LEVEL_EXCEPTION_FILTER g_prevUef;
-static volatile LONG g_crashOnce;
 static DWORD g_mainTid;
 static struct { u32 code, eip, tid, tick; } g_exc[48];   /* first-chance exceptions seen */
 static volatile LONG g_excN;
@@ -324,8 +401,37 @@ static void crash_write(PEXCEPTION_POINTERS ep)
             s_cat(list, tmp, sizeof(list));
         }
         crash_putf("notes=%s", list); }
+    /* 1.1: files the game opened, the mods list (for SLAMCrash.exe's checks) */
+    {   int k, nf = ft_sorted(), cnt = 0; char list[600]; u32 now = GetTickCount();
+        list[0] = 0;
+        for (k = 0; k < nf && cnt < 10; k++, cnt++) { if (list[0]) s_cat(list, ",", sizeof(list)); s_cat(list, s_base(g_ft[g_ftOrder[k]].path), sizeof(list)); }
+        crash_putf("files_trail=%d", g_crFileTrail && g_ftNext ? 1 : 0);
+        crash_putf("files_n=%d", nf);
+        crash_putf("files_last=%s", list);
+        for (k = 0; k < nf; k++) if (g_ft[g_ftOrder[k]].tid == GetCurrentThreadId()) break;
+        crash_putf("thread_last_file=%s", k < nf ? g_ft[g_ftOrder[k]].path : "");
+        crash_putf("thread_last_file_ms=%u", k < nf ? now - g_ft[g_ftOrder[k]].last : 0);
+        list[0] = 0;
+        for (k = 0; k < g_modN; k++) {
+            s_fmt(tmp, sizeof(tmp), "%s %s", g_mods[k].name, g_mods[k].version);
+            if (list[0]) s_cat(list, ",", sizeof(list));
+            s_cat(list, tmp, sizeof(list));
+        }
+        crash_putf("mods=%s", list);
+        crash_putf("crash_tid=%u", GetCurrentThreadId());
+    }
     crash_put("[/facts]");
     crash_put("");
+    /* every file of the trail, newest first: "<ms before the crash>|<thread>|<opened ok>|<times>|<path>" */
+    {   int k, nf = g_ftSorted; u32 now = GetTickCount();
+        crash_put("[files]");
+        for (k = 0; k < nf && k < 400; k++) {
+            const FtEntry *e = &g_ft[g_ftOrder[k]];
+            crash_putf("%u|%u|%d|%u|%s", now - e->last, e->tid, e->ok, e->opens, e->path);
+        }
+        crash_put("[/files]");
+        crash_put("");
+    }
 
     /* readable part */
     crash_put("==================================================================================");
@@ -380,6 +486,19 @@ static void crash_write(PEXCEPTION_POINTERS ep)
     crash_put("");
     crash_putf("Memory: %u MB used of %u MB, %u MB free, largest free block %u MB (lowest this run: %u MB)",
                usedMb, totalMb, freeMb, bigMb, g_lowFreeMax == 0xFFFFFFFFu ? bigMb : g_lowFreeMax >> 20);
+    {   int k, nf = g_ftSorted; u32 now = GetTickCount(), tid = GetCurrentThreadId();
+        crash_put("");
+        if (!g_crFileTrail || !g_ftNext) crash_put("Game files opened: not recorded (SLAM.ini [Crash] FileTrail=0, or the hook was not possible)");
+        else {
+            crash_putf("Game files opened last (newest first, %d different files this session%s):", nf, g_ftLost ? ", some not recorded" : "");
+            for (k = 0; k < nf && k < 40; k++) {
+                const FtEntry *e = &g_ft[g_ftOrder[k]]; u32 ms = now - e->last;
+                crash_putf("    %5u.%u s before  %s%s%s", ms / 1000, (ms % 1000) / 100, e->path, e->ok ? "" : "  (could not be opened)",
+                           e->tid == tid ? "  <- by the crashing thread" : "");
+            }
+            if (nf > 40) crash_put("    ... (all of them in the [files] block at the top)");
+        }
+    }
     if (g_excN) {
         LONG k, m = g_excN < 48 ? g_excN : 48;
         crash_put("");
@@ -512,6 +631,7 @@ static void crash_late_init(void)
     if (n && n < MAX_PATH - 14) { s_cat(dbg, "\\dbghelp.dll", MAX_PATH); dh = LoadLibraryA(dbg); }
     g_miniDump = dh ? (MiniDump_t)GetProcAddress(dh, "MiniDumpWriteDump") : 0;
     crash_prune();
+    ft_install();             /* before the mods: SLAM's link is the innermost one (sees the final file names) */
     slog("crash report: on - reports go to SLAM\\crash\\ (%s%s%s)", g_miniDump ? "with minidump" : "no minidump: dbghelp.dll missing",
          g_crTestKey ? ", test key " : "", g_crTestKey ? g_crTestName : "");
 }

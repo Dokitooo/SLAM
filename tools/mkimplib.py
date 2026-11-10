@@ -4,7 +4,7 @@
 Which DLL a function lives in comes from MinGW-w64's lib32 .def files (env MGWCRT = mingw-w64-crt folder)."""
 import glob, os, re, subprocess, sys
 LLVM = "/usr/lib/llvm-18/bin/"
-crt = os.environ.get("MGWCRT", "/home/dev/ext/mgw0/mingw-w64-crt")
+crt = os.environ["MGWCRT"]  # the mingw-w64-crt folder
 PREFER = ["kernel32", "user32", "gdi32", "shell32", "advapi32", "ole32", "oleaut32", "winmm", "d3d9", "dbghelp", "version"]
 where = {}
 for dll in PREFER:

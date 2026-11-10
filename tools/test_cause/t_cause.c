@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include "../../src/crashui/cause.inc"
 static int fails;
+static const char *g_tail = "";
 static void check(const char *name, const char *facts, const char *expectHead, const char *expectBlame)
 {
-    CauseFacts fx; CauseResult r; char text[4000];
-    snprintf(text, sizeof text, "[facts]\r\n%s[/facts]\r\n\r\nHuman part\r\nmodule=WRONG\r\n", facts);
-    cause_parse(text, &fx); cause_guess(&fx, &r);
+    CauseFacts fx; CauseResult r; char text[8000];
+    snprintf(text, sizeof text, "[facts]\r\n%s[/facts]\r\n\r\nHuman part\r\nmodule=WRONG\r\n%s", facts, g_tail);
+    cause_parse(text, &fx); { static CauseExtra cx; cause_extra(text, &cx); cause_guess(&fx, &cx, &r); }
     int ok = strstr(r.headline, expectHead) && strcmp(r.blame, expectBlame) == 0;
     if (!ok) fails++;
     printf("%s %-14s sure=%d blame=[%s]\n   %s\n", ok ? "PASS" : "FAIL", name, r.sure, r.blame, r.headline);
@@ -37,6 +38,20 @@ int main(void)
     check("stackovf", "code=C00000FD\nkind=stack overflow\neip_in_module=1\nmodule=ntdll.dll\nexe_ts=52202C7F\n", "out of stack", "");
     check("cpp", "code=E06D7363\neip_in_module=1\nmodule=KERNELBASE.dll\nexe_ts=52202C7F\n", "not handled", "");
     check("empty", "", "no clear cause", "");
+    /* 1.1: findings from SLAMCrash.exe */
+    g_tail = "\r\n[findings]\r\nfile|190|C|2026-11-10 14:00|crowd.iff\r\nfile|2|RT||team_008.iff\r\nlog|SigExt|5|[14:03:17] ERROR slot table full\r\nprobe|AnimProbe 0.3.0\r\n[/findings]\r\n";
+    check("files-null", BASE "module=nba2k14.exe\naccess=write\ntarget=00000084\nthread=other\n", "changed game file", "");
+    check("files-null-body", BASE "module=nba2k14.exe\naccess=write\ntarget=00000084\n", "changed game file", "");
+    check("files-mod", BASE "module=CrowdTune.asi\nmodule_mod=CrowdTune\nmodule_is_slam_mod=1\n", "inside the mod", "CrowdTune");
+    g_tail = "\r\n[findings]\r\nlog|BodyHook|3|[22:10:01] cloth: ERROR rebuild failed\r\n[/findings]\r\n";
+    check("log-only", BASE "module=KERNELBASE.dll\n", "BodyHook reported a problem", "BodyHook");
+    g_tail = "\r\n[findings]\r\nlog|SLAM|3|[22:10:01] hooks: conflict\r\n[/findings]\r\n";
+    check("log-slam", BASE "module=KERNELBASE.dll\n", "no clear cause", "");
+    g_tail = "\r\n[findings]\r\nlog|Redir|2|[22:10:01] ERROR x\r\nlog|SLAM|2|[22:10:01] WARNING y\r\n[/findings]\r\n";
+    check("log-mixed", BASE "module=KERNELBASE.dll\n", "Redir reported a problem", "Redir");
+    g_tail = "\r\n[findings]\r\nlog|A|2|ERROR x\r\nlog|B|2|ERROR y\r\n[/findings]\r\n";
+    check("log-two", BASE "module=KERNELBASE.dll\n", "no clear cause", "");
+    g_tail = "";
     printf("\nFAILURES %d\n", fails);
     return fails != 0;
 }
