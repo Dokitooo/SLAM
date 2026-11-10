@@ -15,8 +15,8 @@ the game runs. When the game starts, SLAM shows the list of loaded mods at the t
 
 ## Install
 
-Copy everything from the **`Game folder`** folder of this zip into your NBA 2K14 folder (the one
-with `nba2k14.exe`):
+Copy everything from the **`Drag to 2K14 FOLDER`** folder of the zip into your NBA 2K14 folder
+(the one with `nba2k14.exe`):
 
 ```
 NBA 2K14\
@@ -34,9 +34,6 @@ Then put SLAM mods into `SLAM\`, each mod in its own folder:
         CrowdTune\CrowdTune.asi
 ```
 
-Want to check that it works? Copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
-small example mod that only writes `SLAM\HelloSLAM\HelloSLAM.log` (delete it afterwards).
-
 Start the game. `SLAM\SLAM.log` lists what was loaded. `SLAM\SLAM.ini` is created on the first
 start.
 
@@ -49,8 +46,8 @@ its own loader) or another mod:
   game folder. SLAM loads it first, so it works as before.
 
 **Already use another ASI loader** (e.g. Ultimate ASI Loader as `winmm.dll` or `d3d9.dll`)?
-Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` into your `scripts\` folder instead, and
-keep `SLAM\SLAMCrash.exe` as above.
+Don't use SLAM's `dinput8.dll`. Build `SLAM.asi` from this repository (`build\build_msvc.bat`),
+put it into your `scripts\` folder instead, and keep `SLAM\SLAMCrash.exe` as above.
 
 ## Update
 
@@ -186,7 +183,7 @@ Each SLAM mod also writes its own log to `SLAM\<Mod>\<Mod>.log`.
 ---
 
 SLAM 1.0.0 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
-Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see `SDK\SDK.md`.
+Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see [`SDK.md`](SDK.md).
 
 
 ## Verify your download
