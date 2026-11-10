@@ -1,4 +1,4 @@
-> **Download:** [SLAM.zip](https://github.com/Dokitooo/SLAM/releases/latest/download/SLAM.zip) (latest release) ·
+> **Download:** [SLAM_v1.0.0.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.0/SLAM_v1.0.0.zip) (latest release) ·
 > [all releases](https://github.com/Dokitooo/SLAM/releases)
 
 # SLAM 1.0.0 — Script Loader & Add-on Manager for NBA 2K14 (PC)
@@ -195,7 +195,7 @@ Every release lists the SHA-256 of each zip in `SHA256SUMS.txt` (also attached t
 Compare it with the hash of the file you downloaded:
 
 ```powershell
-Get-FileHash .\SLAM.zip -Algorithm SHA256
+Get-FileHash .\SLAM_v1.0.0.zip -Algorithm SHA256
 ```
 
 ```bash
