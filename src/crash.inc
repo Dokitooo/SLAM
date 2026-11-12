@@ -401,7 +401,7 @@ static void crash_write(PEXCEPTION_POINTERS ep)
             s_cat(list, tmp, sizeof(list));
         }
         crash_putf("notes=%s", list); }
-    /* 1.1: files the game opened, the mods list (for SLAMCrash.exe's checks) */
+    /* files the game opened, the mods list (for SLAMCrash.exe's checks) */
     {   int k, nf = ft_sorted(), cnt = 0; char list[600]; u32 now = GetTickCount();
         list[0] = 0;
         for (k = 0; k < nf && cnt < 10; k++, cnt++) { if (list[0]) s_cat(list, ",", sizeof(list)); s_cat(list, s_base(g_ft[g_ftOrder[k]].path), sizeof(list)); }

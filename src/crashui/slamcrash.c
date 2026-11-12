@@ -2,13 +2,15 @@
  *
  *   SLAMCrash.exe "<SLAM\crash\crash_....log>"   show that report
  *   SLAMCrash.exe                                show the newest report in <this folder>\crash\
+ *   SLAMCrash.exe /grant "<game>" "<VirtualStore>"  1.0.1: started by SLAM with administrator rights when
+ *                                                the game is in Program Files (grant.inc)
  *
- * First (1.1) it adds what it finds on disk to the report, once (findings.inc): changed game files the
+ * First it adds what it finds on disk to the report, once (findings.inc): changed game files the
  * game loaded, problem lines and last lines of the mods' logs, probe builds still installed.
  * Top: the likely cause in plain words (from the report's [facts] block, see cause.inc) and who
  * to send it to. Below: the whole report. Buttons: Copy report, Open crash folder, Close.
  * It is a separate program because a crashed game can't be trusted to draw a window.
- * No C runtime; imports kernel32, user32, gdi32, shell32 only.
+ * No C runtime; imports kernel32, user32, gdi32, shell32, advapi32 (1.0.1) only.
  */
 #include <windows.h>
 #include <shellapi.h>
@@ -39,6 +41,7 @@ void *__cdecl memcpy(void *d, const void *s, size_t n) { unsigned char *p = (uns
 static int px(int v) { return MulDiv(v, g_dpi, 96); }
 static void s_cpy(char *d, const char *s, int cap) { int i = 0; for (; s[i] && i < cap - 1; i++) d[i] = s[i]; d[i] = 0; }
 #include "findings.inc"
+#include "grant.inc"
 
 /* ---- the report file -------------------------------------------------------------------------- */
 static char *read_text(const char *path)
@@ -238,6 +241,10 @@ void __stdcall start(void)
     WNDCLASSA wc; MSG msg; RECT r; int w, h;
     BOOL (WINAPI *dpiAware)(void) = (BOOL (WINAPI *)(void))GetProcAddress(GetModuleHandleA("user32.dll"), "SetProcessDPIAware");
     if (dpiAware) dpiAware();
+    {   /* 1.0.1: SLAMCrash.exe /grant "<game>" "<VirtualStore copy>" - started by SLAM with administrator rights (grant.inc) */
+        int ac = 0; WCHAR **av = CommandLineToArgvW(GetCommandLineW(), &ac);
+        if (av && ac >= 3 && !lstrcmpiW(av[1], L"/grant")) ExitProcess((UINT)grant_main(ac, av));
+    }
 
     first_arg(g_path, MAX_PATH);
     if (!g_path[0] && !find_newest(g_path)) {

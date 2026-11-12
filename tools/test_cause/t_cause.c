@@ -38,7 +38,7 @@ int main(void)
     check("stackovf", "code=C00000FD\nkind=stack overflow\neip_in_module=1\nmodule=ntdll.dll\nexe_ts=52202C7F\n", "out of stack", "");
     check("cpp", "code=E06D7363\neip_in_module=1\nmodule=KERNELBASE.dll\nexe_ts=52202C7F\n", "not handled", "");
     check("empty", "", "no clear cause", "");
-    /* 1.1: findings from SLAMCrash.exe */
+    /* findings from SLAMCrash.exe */
     g_tail = "\r\n[findings]\r\nfile|190|C|2026-11-10 14:00|crowd.iff\r\nfile|2|RT||team_008.iff\r\nlog|SigExt|5|[14:03:17] ERROR slot table full\r\nprobe|AnimProbe 0.3.0\r\n[/findings]\r\n";
     check("files-null", BASE "module=nba2k14.exe\naccess=write\ntarget=00000084\nthread=other\n", "changed game file", "");
     check("files-null-body", BASE "module=nba2k14.exe\naccess=write\ntarget=00000084\n", "changed game file", "");

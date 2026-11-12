@@ -4,7 +4,7 @@
  * (tools/test_cause). Rules are checked from most to least specific; the first rule that fits
  * gives the headline, later rules may add "also" lines.
  *
- * Since 1.1 the report can also hold a [findings] block, added by SLAMCrash.exe when it opens the
+ * The report can also hold a [findings] block, added by SLAMCrash.exe when it opens the
  * report: the changed game files the game loaded this session (RED MC-edited, or changed after the
  * game was installed), recent problem lines from the mods' logs, and probe/test builds of mods.
  * cause_extra() reads it; cause_guess() uses it when it is there (it may be missing: older report,

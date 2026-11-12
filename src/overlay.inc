@@ -1,6 +1,6 @@
 /* overlay.inc - the mod list shown at the top left when the game starts (text only, then gone)
  *
- *   SLAM 1.0.0
+ *   SLAM 1.0.1
  *   BodyHook 1.19.9      SLAM
  *   CrowdTune            plain .asi
  *   OldMod.asi           FAILED to load

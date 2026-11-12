@@ -227,6 +227,7 @@ static void load_all(void)
 {
     char full[MAX_PATH]; int i, plain = 0, slam = 0;
     if (InterlockedExchange(&g_loadedAll, 1)) return;
+    folder_check();           /* 1.0.1: game in Program Files - before any mod writes a file */
     ready_install();          /* game-ready detection, before any mod can register for it */
     crash_late_init();        /* dbghelp.dll + old report cleanup: not allowed in DllMain */
     dinput_load_real();       /* dinput8_next.dll (a dinput8-only mod) gets in before the other mods */

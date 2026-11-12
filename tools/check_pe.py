@@ -6,7 +6,7 @@ RO = "/usr/lib/llvm-18/bin/llvm-readobj"
 EXPECT = {
     "dinput8.dll":   ({"kernel32.dll", "user32.dll", "gdi32.dll"}, {"DirectInput8Create", "DllCanUnloadNow", "DllGetClassObject", "DllRegisterServer", "DllUnregisterServer"}),
     "SLAM.asi":      ({"kernel32.dll", "user32.dll", "gdi32.dll"}, set()),
-    "SLAMCrash.exe": ({"kernel32.dll", "user32.dll", "gdi32.dll", "shell32.dll"}, set()),
+    "SLAMCrash.exe": ({"kernel32.dll", "user32.dll", "gdi32.dll", "shell32.dll", "advapi32.dll"}, set()),
     "HelloSLAM.asi": ({"kernel32.dll"}, {"SlamModInfo", "SlamModStart"}),
     "MyMod.asi":     ({"kernel32.dll"}, {"SlamModInfo", "SlamModStart"}),
 }

@@ -1,7 +1,8 @@
-> **Download:** [SLAM_v1.0.0.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.0/SLAM_v1.0.0.zip) (latest release) ·
+> **Download:** [SLAM_v1.0.1.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.1/SLAM_v1.0.1.zip) (latest release) ·
+> [SLAM_v1.0.1_Extras.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.1/SLAM_v1.0.1_Extras.zip) (`SLAM.asi`, HelloSLAM) ·
 > [all releases](https://github.com/Dokitooo/SLAM/releases)
 
-# SLAM 1.0.0 — Script Loader & Add-on Manager for NBA 2K14 (PC)
+# SLAM 1.0.1 — Script Loader & Add-on Manager for NBA 2K14 (PC)
 
 SLAM loads mods for NBA 2K14, the way CLEO does for GTA San Andreas. Mods like **BodyHook**,
 **CrowdTune**, **NosebleedCam** and **SigExt** need it. It also writes a crash report when the
@@ -15,15 +16,15 @@ the game runs. When the game starts, SLAM shows the list of loaded mods at the t
 
 ## Install
 
-Copy everything from the **`Drag to 2K14 FOLDER`** folder of the zip into your NBA 2K14 folder
-(the one with `nba2k14.exe`):
+Copy everything from the **`Drag to 2K14 FOLDER`** folder of the zip into your NBA 2K14 folder (the one
+with `nba2k14.exe`):
 
 ```
 NBA 2K14\
     nba2k14.exe
     dinput8.dll              <- SLAM
     SLAM\
-        SLAMCrash.exe        <- the crash window
+        SLAMCrash.exe        <- the crash window (and the Program Files fix)
 ```
 
 Then put SLAM mods into `SLAM\`, each mod in its own folder:
@@ -33,6 +34,9 @@ Then put SLAM mods into `SLAM\`, each mod in its own folder:
         BodyHook\BodyHook.asi   (+ its .ini and files)
         CrowdTune\CrowdTune.asi
 ```
+
+Want to check that it works? From `SLAM_v1.0.1_Extras.zip`, copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
+small example mod that only writes `SLAM\HelloSLAM\HelloSLAM.log` (delete it afterwards).
 
 Start the game. `SLAM\SLAM.log` lists what was loaded. `SLAM\SLAM.ini` is created on the first
 start.
@@ -46,8 +50,25 @@ its own loader) or another mod:
   game folder. SLAM loads it first, so it works as before.
 
 **Already use another ASI loader** (e.g. Ultimate ASI Loader as `winmm.dll` or `d3d9.dll`)?
-Don't use SLAM's `dinput8.dll`. Build `SLAM.asi` from this repository (`build\build_msvc.bat`),
-put it into your `scripts\` folder instead, and keep `SLAM\SLAMCrash.exe` as above.
+Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` from `SLAM_v1.0.1_Extras.zip` into your `scripts\` folder instead, and
+keep `SLAM\SLAMCrash.exe` as above.
+
+## NBA 2K14 in Program Files
+
+Windows protects `C:\Program Files` and `C:\Program Files (x86)`. There, the game (and with it SLAM and
+every mod) may not write into its own folder, so Windows quietly puts the files somewhere else
+(`%LOCALAPPDATA%\VirtualStore\...`): `SLAM.log`, the mods' logs, ini and roster files never show up in
+the game folder, and changes you make to the mods' files can be ignored.
+
+SLAM 1.0.1 notices this when the game starts, before any mod loads, and asks once:
+
+- **Yes**: Windows asks for administrator rights (the prompt shows `SLAMCrash.exe`). Your Windows user may then
+  change the NBA 2K14 folder (SLAM, every SLAM mod and normal `.asi` mods), and the files Windows had put into
+  VirtualStore are moved back (the newer copy wins). Details: `SLAM\SLAM folder permission.log`. Needed once.
+- **No**: the game starts as before; SLAM asks again next time.
+- **Cancel**: the game starts and SLAM doesn't ask again (`[Folder] Ask=0` in `SLAM.ini`).
+
+Or move the game out of Program Files (e.g. `C:\Games\NBA 2K14`), or run `nba2k14.exe` as administrator.
 
 ## Update
 
@@ -86,7 +107,7 @@ coordinate their changes with other mods.
 For 3 seconds after the game window appears, the top left shows what SLAM loaded:
 
 ```
-SLAM 1.0.0
+SLAM 1.0.1
 BodyHook 1.19.9      SLAM
 CrowdTune 1.5.1      SLAM
 SomeOldMod           plain .asi
@@ -114,6 +135,9 @@ TestKey=Ctrl+F11 ; test key: test report + crash window (any combination, e.g. A
 TestCloses=0     ; 1 = the test really closes the game, like a crash
 Keep=20          ; crash reports kept in SLAM\crash\
 FileTrail=1      ; remember which game files (.iff .ros ...) the game opened, for the crash report
+
+[Folder]
+Ask=1            ; game in Program Files: offer the fix at start (0 = don't ask)
 
 [Overlay]
 Show=1           ; list of loaded mods at the top left when the game starts
@@ -190,6 +214,7 @@ Each SLAM mod also writes its own log to `SLAM\<Mod>\<Mod>.log`.
 | Problem | Try |
 |---|---|
 | No `SLAM\SLAM.log` after starting | `dinput8.dll` isn't next to `nba2k14.exe`, or another ASI loader is used → see "Already use another ASI loader". |
+| No `SLAM\SLAM.log`, mods' files "don't save", game in Program Files | See "NBA 2K14 in Program Files" (answer Yes once, or move the game). The files may be in `%LOCALAPPDATA%\VirtualStore\`. |
 | "SLAM is too old" window | Install the latest SLAM. |
 | A mod is listed as `FAILED` in `SLAM.log` | The line says why; error 126 = a DLL the mod needs is missing (put it next to the `.asi`). |
 | `CONFLICT` lines in `SLAM.log` | Two mods change the same thing. Use only one of them, or ask the authors. |
@@ -197,32 +222,5 @@ Each SLAM mod also writes its own log to `SLAM\<Mod>\<Mod>.log`.
 
 ---
 
-SLAM 1.0.0 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
-Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see [`SDK.md`](SDK.md).
-
-
-## Verify your download
-
-Every release lists the SHA-256 of each zip in `SHA256SUMS.txt` (also attached to the release).
-Compare it with the hash of the file you downloaded:
-
-```powershell
-Get-FileHash .\SLAM_v1.0.0.zip -Algorithm SHA256
-```
-
-```bash
-sha256sum -c SHA256SUMS.txt
-```
-
-## About antivirus warnings
-
-The DLL/ASI files in this mod hook into `nba2k14.exe` at runtime, which some antivirus heuristics
-flag on unknown files. To make the release easy to check:
-
-- The full source is in this repository; the release binaries are built from it.
-- Binaries are not packed, compressed or obfuscated, and the zip has no password.
-- Every binary carries version information (right-click > Properties > Details).
-- SHA-256 checksums are published with each release.
-
-If your antivirus still flags a file, you can submit it as a false positive to the vendor, or
-build it yourself from the source.
+SLAM 1.0.1 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
+Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see `SDK\SDK.md`.

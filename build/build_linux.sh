@@ -16,7 +16,7 @@ CF="--target=i686-pc-windows-msvc /c /O2 /GS- /Gs999999 /Zl /W3 -D_X86_ -fgnuc-v
 LF="/brepro /nodefaultlib /machine:x86 /safeseh:no /opt:ref /dynamicbase /nxcompat"
 
 for k in kernel32 user32 gdi32; do llvm-dlltool -m i386 -k -d build/linux/$k.def -l $OBJ/$k.lib; done
-for k in kernel32 user32 gdi32 shell32; do llvm-dlltool -m i386 -k -d build/linux/crash_$k.def -l $OBJ/crash_$k.lib; done
+for k in kernel32 user32 gdi32 shell32 advapi32; do llvm-dlltool -m i386 -k -d build/linux/crash_$k.def -l $OBJ/crash_$k.lib; done
 
 # MinHook, unmodified (its intrinsics clash with clang's intrin.h, so they are off)
 MH=""
@@ -40,7 +40,7 @@ lld-link $LF /dll /entry:DllMain@12 /subsystem:windows,5.01 /out:$OUT/SLAM.asi \
 clang-cl $CF /O1 /Fo$OBJ/slamcrash.obj src/crashui/slamcrash.c
 (cd src/crashui && llvm-rc /fo ../../$OBJ/slamcrash.res slamcrash.rc)
 lld-link $LF /entry:start /subsystem:windows,5.01 /largeaddressaware /out:$OUT/SLAMCrash.exe $OBJ/slamcrash.obj $OBJ/slamcrash.res \
-  $OBJ/crash_kernel32.lib $OBJ/crash_user32.lib $OBJ/crash_gdi32.lib $OBJ/crash_shell32.lib
+  $OBJ/crash_kernel32.lib $OBJ/crash_user32.lib $OBJ/crash_gdi32.lib $OBJ/crash_shell32.lib $OBJ/crash_advapi32.lib
 
 rm -f $OUT/*.lib $OUT/*.exp
 [ -x examples/build_linux.sh ] && examples/build_linux.sh

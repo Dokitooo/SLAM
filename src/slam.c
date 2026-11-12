@@ -7,6 +7,7 @@
  * If both are installed, the second copy notices the first and only forwards DirectInput.
  *
  * What it does, in order:
+ *   (1.0.1) entry point first: is the game folder writable? (folder.inc - Program Files)
  *   DllMain        paths, SLAM\SLAM.ini, SLAM\SLAM.log, crash handlers, "SLAM is here" record for
  *                  the mods' SDK stub, then holds the game's entry point (loader.inc)
  *   entry point    dinput8_next.dll, then every mod (loader.inc), then the game starts
@@ -22,7 +23,7 @@
  *
  * License: BSD-2-Clause. Hook engine: MinHook (BSD-2), vendored in third_party\minhook.
  */
-#define SLAM_VERSION "1.0.0"
+#define SLAM_VERSION "1.0.1"
 #define SLAM_KNOWN_EXE_TS 0x52202C7Fu          /* the nba2k14.exe build SLAM was made with */
 
 #define WIN32_LEAN_AND_MEAN
@@ -77,6 +78,7 @@ static void overlay_install(void);
 
 #include "util.inc"
 #include "log.inc"
+#include "folder.inc"
 #include "hooks.inc"
 #include "loader.inc"
 #include "crash.inc"
@@ -113,6 +115,10 @@ static const char kDefaultIni[] =
     "; 1 = remember which game files (.iff .ros ...) the game opened, for the crash report\r\n"
     "FileTrail=1\r\n"
     "\r\n"
+    "[Folder]\r\n"
+    "; 1 = if NBA 2K14 is in a folder Windows protects (Program Files), offer to fix it at start (once)\r\n"
+    "Ask=1\r\n"
+    "\r\n"
     "[Overlay]\r\n"
     "; 1 = show the list of loaded mods at the top left when the game starts\r\n"
     "Show=1\r\n"
@@ -137,6 +143,7 @@ static void config_load(void)
     ini_add("Crash", "FileTrail", "1");
     ini_add("Overlay", "Show", "1"); ini_add("Overlay", "Seconds", "3");
     ini_add("Crash", "TestKey", "Ctrl+F11"); ini_add("Crash", "TestCloses", "0");
+    ini_add("Folder", "Ask", "1");
     GetPrivateProfileStringA("Mods", "LoadFirst", "", g_cfgLoadFirst, sizeof(g_cfgLoadFirst), g_iniPath);
     GetPrivateProfileStringA("Mods", "Disabled", "", g_cfgDisabled, sizeof(g_cfgDisabled), g_iniPath);
     crash_config(g_iniPath);

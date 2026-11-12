@@ -1,8 +1,8 @@
 #define RT_MANIFEST 24
 1 RT_MANIFEST "slamcrash.manifest"
 1 VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION 1,0,1,0
+PRODUCTVERSION 1,0,1,0
 FILEOS 0x4
 FILETYPE 0x1
 BEGIN
@@ -11,12 +11,12 @@ BEGIN
     BLOCK "040904B0"
     BEGIN
       VALUE "CompanyName", "SLAM mod loader for NBA 2K14"
-      VALUE "FileDescription", "SLAM crash report window"
-      VALUE "FileVersion", "1.0.0"
+      VALUE "FileDescription", "SLAM - crash window and NBA 2K14 folder permission"
+      VALUE "FileVersion", "1.0.1"
       VALUE "InternalName", "SLAMCrash"
       VALUE "OriginalFilename", "SLAMCrash.exe"
       VALUE "ProductName", "SLAM (Script Loader & Add-on Manager)"
-      VALUE "ProductVersion", "1.0.0"
+      VALUE "ProductVersion", "1.0.1"
       VALUE "LegalCopyright", "BSD-2-Clause"
     END
   END

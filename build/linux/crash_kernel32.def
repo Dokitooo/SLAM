@@ -2,16 +2,25 @@ LIBRARY kernel32.dll
 EXPORTS
     CloseHandle@4
     CompareFileTime@8
+    CreateDirectoryW@8
     CreateFileA@28
+    CreateFileW@28
+    DeleteFileW@4
     ExitProcess@4
     FileTimeToLocalFileTime@8
     FileTimeToSystemTime@8
     FindClose@4
     FindFirstFileA@8
+    FindFirstFileW@8
     FindNextFileA@8
+    FindNextFileW@8
     GetCommandLineA@0
+    GetCommandLineW@0
+    GetFileAttributesExW@12
+    GetFileAttributesW@4
     GetFileSize@8
     GetFileTime@16
+    GetLocalTime@4
     GetModuleFileNameA@12
     GetModuleHandleA@4
     GetProcAddress@8
@@ -19,10 +28,16 @@ EXPORTS
     GlobalFree@4
     GlobalLock@4
     GlobalUnlock@4
+    LocalFree@4
+    MoveFileExW@12
     MulDiv@12
     ReadFile@20
+    RemoveDirectoryW@4
+    SetFileAttributesW@8
     SetFilePointer@16
     SetFileTime@16
     VirtualAlloc@16
     VirtualFree@12
+    WideCharToMultiByte@32
     WriteFile@20
+    lstrcmpiW@8

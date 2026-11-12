@@ -31,3 +31,4 @@ EXPORTS
     SetWindowTextA@8
     SystemParametersInfoA@16
     TranslateMessage@4
+    wsprintfW

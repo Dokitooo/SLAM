@@ -1,0 +1,7 @@
+LIBRARY advapi32.dll
+EXPORTS
+    AllocateAndInitializeSid@44
+    FreeSid@4
+    GetNamedSecurityInfoW@32
+    SetEntriesInAclW@16
+    SetNamedSecurityInfoW@28

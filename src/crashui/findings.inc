@@ -1,4 +1,4 @@
-/* findings.inc - SLAMCrash.exe looks around after a crash (1.1)
+/* findings.inc - SLAMCrash.exe looks around after a crash
  *
  * The game is gone by now, so this can take its time and use the disk freely. It adds a
  * [findings] block (read by cause.inc) and a readable part to the end of the report, once:

@@ -20,6 +20,8 @@ EXPORTS
     GetCurrentProcess@0
     GetCurrentProcessId@0
     GetCurrentThreadId@0
+    GetEnvironmentVariableA@12
+    GetExitCodeProcess@8
     GetFileAttributesA@4
     GetFileSize@8
     GetLastError@0
@@ -53,8 +55,9 @@ EXPORTS
     ReadFile@20
     ResumeThread@4
     RtlCaptureContext@4
-    SetThreadContext@8
+    SetFilePointer@16
     SetLastError@4
+    SetThreadContext@8
     SetUnhandledExceptionFilter@4
     Sleep@4
     SuspendThread@4
