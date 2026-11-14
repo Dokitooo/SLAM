@@ -156,10 +156,49 @@ static SlamMod *mod_register_locked(HMODULE h, const char *rel)
     return m;
 }
 
+/* 1.0.2: a plain .asi that exports InitializeASI (the Ultimate ASI Loader convention) only starts when its loader
+ * calls it - e.g. CurvedShotMeter.asi, which shipped its own dinput8.dll just to do that (and that dinput8.dll pushed
+ * SLAM aside: SLAM then started late, go-to shots never came). SLAM calls it once, in load order, for the plain .asi
+ * files SLAM itself loaded (one that another loader loaded first was already started by that loader).
+ * WHEN: like that dinput8.dll did - right after the game's first DirectInput8Create (the game window and Direct3D
+ * exist by then). Called at process start, the shot meter's rendering core crashed inside d3d9.dll (crash 15-09-50).
+ * SLAM.asi (under another loader, no dinput8 export): at once, as before. */
+typedef void (__cdecl *InitAsi_t)(void);
+static volatile LONG g_plainPending, g_plainDone;
+static void plain_init(SlamMod *m)
+{
+    InitAsi_t f;
+    if (m->isSlam || !m->fresh || !m->h) return;
+    if (!(f = (InitAsi_t)(void *)GetProcAddress(m->h, "InitializeASI"))) return;
+    if (InterlockedExchange(&m->claim, 1)) return;
+    f();
+    m->started = 1;
+    slog("mods: started %s (plain .asi: InitializeASI called)", m->rel[0] ? m->rel : m->name);
+}
+static void plain_start(SlamMod *m)
+{
+    if (m->isSlam || !m->fresh || !m->h || !GetProcAddress(m->h, "InitializeASI")) return;
+#ifdef SLAM_ASI
+    plain_init(m);
+#else
+    if (g_plainDone) { plain_init(m); return; }
+    g_plainPending = 1;
+    slog("mods: %s exports InitializeASI - called when the game sets up DirectInput (after its window and Direct3D)", m->rel[0] ? m->rel : m->name);
+#endif
+}
+/* the game's first DirectInput8Create (SLAM's own export): start the waiting plain .asi mods, in load order */
+static void plain_start_pending(void)
+{
+    int i;
+    if (InterlockedExchange(&g_plainDone, 1) || !g_plainPending) return;
+    for (i = 0; i < g_modN; i++) plain_init(&g_mods[i]);
+}
+
 static void mod_start(SlamMod *m)
 {
     int r;
-    if (!m->isSlam || m->failed) return;
+    if (!m->isSlam) { plain_start(m); return; }
+    if (m->failed) return;
     if (InterlockedExchange(&m->claim, 1)) return;          /* loader and SDK stub may both ask */
     if (m->apiNeed > SLAM_API_VERSION) {
         m->failed = 1;
@@ -239,9 +278,10 @@ static void load_all(void)
     apply_load_first();
     adopt_loaded();
     for (i = 0; i < g_foundN; i++) {
-        HMODULE h; SlamMod *m;
+        HMODULE h, pre; SlamMod *m;
         s_cpy(full, g_gameDir, MAX_PATH); s_cat(full, g_found[i], MAX_PATH);
         check_dll_clash(g_found[i], full);
+        pre = GetModuleHandleA(full);                 /* 1.0.2: already loaded (and started) by another loader? */
         h = LoadLibraryExA(full, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
         if (!h) {
             DWORD e = GetLastError();
@@ -253,6 +293,7 @@ static void load_all(void)
         }
         if (h == g_self) { slog("mods: skipped %s (that is SLAM itself)", g_found[i]); continue; }
         m = mod_register(h, g_found[i]);
+        if (m && !pre) m->fresh = 1;
         if (m) slog("mods: loaded  %-40s %s %s%s", g_found[i], m->isSlam ? m->name : "", m->isSlam ? m->version : "(plain .asi, not a SLAM mod)",
                     m->isSlam && m->author[0] ? "" : "");
     }

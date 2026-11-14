@@ -10,10 +10,10 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "SLAM mod loader for NBA 2K14"
       VALUE "FileDescription", "SLAM - Script Loader & Add-on Manager for NBA 2K14"
-      VALUE "FileVersion", "1.0.1"
+      VALUE "FileVersion", "1.0.2"
       VALUE "InternalName", "SLAM"
       VALUE "ProductName", "SLAM (Script Loader & Add-on Manager)"
-      VALUE "ProductVersion", "1.0.1"
+      VALUE "ProductVersion", "1.0.2"
       VALUE "LegalCopyright", "BSD-2-Clause; MinHook (c) Tsuda Kageyu, BSD-2-Clause"
     END
   END

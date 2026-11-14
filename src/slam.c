@@ -23,7 +23,7 @@
  *
  * License: BSD-2-Clause. Hook engine: MinHook (BSD-2), vendored in third_party\minhook.
  */
-#define SLAM_VERSION "1.0.1"
+#define SLAM_VERSION "1.0.2"
 #define SLAM_KNOWN_EXE_TS 0x52202C7Fu          /* the nba2k14.exe build SLAM was made with */
 
 #define WIN32_LEAN_AND_MEAN
@@ -53,6 +53,7 @@ struct SlamMod {
     void *start;                /* SlamModStart */
     unsigned apiNeed;
     int isSlam, started, failed;
+    int fresh;                  /* 1.0.2: SLAM loaded it (it was not in the process before) */
     volatile LONG nHooks, nPatches;
     volatile LONG claim;        /* set once by whoever starts the mod */
     HANDLE logFile;
@@ -180,7 +181,13 @@ typedef long (WINAPI *DI8Create_t)(HINSTANCE, DWORD, const void *, LPVOID *, LPV
 typedef long (WINAPI *NoArg_t)(void);
 typedef long (WINAPI *GetClass_t)(const void *, const void *, LPVOID *);
 long WINAPI Proxy_DirectInput8Create(HINSTANCE h, DWORD v, const void *riid, LPVOID *out, LPVOID unk)
-{ dinput_load_real(); return g_real[0] ? ((DI8Create_t)g_real[0])(h, v, riid, out, unk) : 0x80004005L; }
+{
+    long r;
+    dinput_load_real();
+    r = g_real[0] ? ((DI8Create_t)g_real[0])(h, v, riid, out, unk) : 0x80004005L;
+    plain_start_pending();          /* 1.0.2: plain .asi mods with InitializeASI (loader.inc) */
+    return r;
+}
 long WINAPI Proxy_DllCanUnloadNow(void) { dinput_load_real(); return g_real[1] ? ((NoArg_t)g_real[1])() : 1; }
 long WINAPI Proxy_DllGetClassObject(const void *a, const void *b, LPVOID *c)
 { dinput_load_real(); return g_real[2] ? ((GetClass_t)g_real[2])(a, b, c) : 0x80040111L; }

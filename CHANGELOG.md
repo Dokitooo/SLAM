@@ -1,5 +1,15 @@
 # SLAM changelog
 
+## 1.0.2
+- **Plain `.asi` mods that need `InitializeASI`** (the Ultimate ASI Loader convention) now start under SLAM:
+  SLAM calls it once, in load order, for each plain `.asi` it loaded itself - right after the game's first
+  `DirectInput8Create` (game window and Direct3D exist then; that is when the shot meter's own `dinput8.dll` did
+  it - calling it at start-up crashed the shot meter inside `d3d9.dll`). Example: `CurvedShotMeter.asi`
+  came with its own `dinput8.dll` only to make that call - that `dinput8.dll` replaced SLAM, SLAM then started
+  late and GotoShotExt's go-to shots never showed up. Now: keep SLAM's `dinput8.dll`, put `CurvedShotMeter.asi`
+  (and its `CurvedShotMeter\` folder) in the game folder. `SLAM.log`: "started CurvedShotMeter.asi (plain .asi:
+  InitializeASI called)". Mods need no update.
+
 ## 1.0.1
 - **NBA 2K14 in Program Files:** the game isn't allowed to write into its own folder there, so Windows put
   `SLAM.log`, the mods' logs, ini and roster files into `%LOCALAPPDATA%\VirtualStore\` (and copies there hid

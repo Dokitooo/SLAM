@@ -1,8 +1,8 @@
-> **Download:** [SLAM_v1.0.1.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.1/SLAM_v1.0.1.zip) (latest release) ·
-> [SLAM_v1.0.1_Extras.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.1/SLAM_v1.0.1_Extras.zip) (`SLAM.asi`, HelloSLAM) ·
+> **Download:** [SLAM_v1.0.2.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.2/SLAM_v1.0.2.zip) (latest release) ·
+> [SLAM_v1.0.2_Extras.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.0.2/SLAM_v1.0.2_Extras.zip) (`SLAM.asi`, HelloSLAM) ·
 > [all releases](https://github.com/Dokitooo/SLAM/releases)
 
-# SLAM 1.0.1 — Script Loader & Add-on Manager for NBA 2K14 (PC)
+# SLAM 1.0.2 — Script Loader & Add-on Manager for NBA 2K14 (PC)
 
 SLAM loads mods for NBA 2K14, the way CLEO does for GTA San Andreas. Mods like **BodyHook**,
 **CrowdTune**, **NosebleedCam** and **SigExt** need it. It also writes a crash report when the
@@ -35,7 +35,7 @@ Then put SLAM mods into `SLAM\`, each mod in its own folder:
         CrowdTune\CrowdTune.asi
 ```
 
-Want to check that it works? From `SLAM_v1.0.1_Extras.zip`, copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
+Want to check that it works? From `SLAM_v1.0.2_Extras.zip`, copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
 small example mod that only writes `SLAM\HelloSLAM\HelloSLAM.log` (delete it afterwards).
 
 Start the game. `SLAM\SLAM.log` lists what was loaded. `SLAM\SLAM.ini` is created on the first
@@ -48,9 +48,12 @@ its own loader) or another mod:
   SLAM.
 - Another mod that came as `dinput8.dll` → rename it to **`dinput8_next.dll`** and keep it in the
   game folder. SLAM loads it first, so it works as before.
+- **Curved Shot Meter** (its `dinput8.dll` renames SLAM to `dinput8_shotmeter_previous.dll`) → delete the
+  shot meter's `dinput8.dll` and rename `dinput8_shotmeter_previous.dll` back to `dinput8.dll`. Keep
+  `CurvedShotMeter.asi` and its `CurvedShotMeter\` folder: SLAM 1.0.2 starts it by itself.
 
 **Already use another ASI loader** (e.g. Ultimate ASI Loader as `winmm.dll` or `d3d9.dll`)?
-Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` from `SLAM_v1.0.1_Extras.zip` into your `scripts\` folder instead, and
+Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` from `SLAM_v1.0.2_Extras.zip` into your `scripts\` folder instead, and
 keep `SLAM\SLAMCrash.exe` as above.
 
 ## NBA 2K14 in Program Files
@@ -99,7 +102,8 @@ DLLs with the same name, Windows can only use one of them. `SLAM.log` reports th
 clash" and names both files.
 
 **Mods that are not made for SLAM** (normal `.asi` mods) still load: SLAM is an ASI loader too.
-They are listed in `SLAM.log` as "plain .asi". SLAM just can't check their version or
+They are listed in `SLAM.log` as "plain .asi" (one that exports `InitializeASI`, the Ultimate ASI
+Loader way, gets it called - 1.0.2). SLAM just can't check their version or
 coordinate their changes with other mods.
 
 ## The mod list at start
@@ -107,7 +111,7 @@ coordinate their changes with other mods.
 For 3 seconds after the game window appears, the top left shows what SLAM loaded:
 
 ```
-SLAM 1.0.1
+SLAM 1.0.2
 BodyHook 1.19.9      SLAM
 CrowdTune 1.5.1      SLAM
 SomeOldMod           plain .asi
@@ -222,5 +226,5 @@ Each SLAM mod also writes its own log to `SLAM\<Mod>\<Mod>.log`.
 
 ---
 
-SLAM 1.0.1 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
+SLAM 1.0.2 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
 Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see `SDK\SDK.md`.
