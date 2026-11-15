@@ -15,6 +15,7 @@
  */
 #define COBJMACROS
 #include <d3d9.h>
+#include "d3d9pick.h"
 
 /* the vtable slots used below, checked against the d3d9.h layout at compile time */
 #include <stddef.h>
@@ -281,7 +282,11 @@ static void overlay_install(void)
 {
     HMODULE d3d; void *fn;
     if (!g_ovShow) { slog("overlay: off (SLAM.ini [Overlay] Show=0)"); return; }
-    d3d = LoadLibraryA("d3d9.dll");                      /* the same d3d9.dll the game will get */
+    {   /* ReShade / ENB / ASI-loader d3d9.dll: hook the Windows d3d9 under it, the wrapper is never touched */
+        char why[400];
+        d3d = d3d9_pick(why, sizeof why);
+        if (why[0]) slog("overlay: %s", why);
+    }
     fn = d3d ? (void *)GetProcAddress(d3d, "Direct3DCreate9") : 0;
     if (!fn || hook_add(&g_core, fn, (void *)ov_D3DCreate9, (void **)&o_D3DCreate9) != SLAM_OK) {
         slog("overlay: Direct3DCreate9 could not be hooked - no mod list");

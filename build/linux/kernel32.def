@@ -70,3 +70,4 @@ EXPORTS
     WaitForSingleObject@8
     WriteFile@20
     WritePrivateProfileStringA@16
+    GetWindowsDirectoryA@8

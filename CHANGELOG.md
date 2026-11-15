@@ -1,5 +1,11 @@
 # SLAM changelog
 
+## 1.0.3
+- **ReShade, ENB and other `d3d9.dll` wrappers:** SLAM no longer touches them. When a `d3d9.dll` that is not
+  Windows' own is in the game folder, SLAM's mod list (overlay) hooks the Windows `d3d9.dll` underneath it, so the
+  wrapper keeps working exactly as without SLAM. DXVK is hooked directly. `SLAM.log` says which one was used
+  ("overlay: d3d9: ReShade in the game folder ..."). SLAM still installs as `dinput8.dll`. Mods need no update.
+
 ## 1.0.2
 - **Plain `.asi` mods that need `InitializeASI`** (the Ultimate ASI Loader convention) now start under SLAM:
   SLAM calls it once, in load order, for each plain `.asi` it loaded itself - right after the game's first
