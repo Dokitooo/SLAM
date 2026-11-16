@@ -336,6 +336,34 @@ static void crash_open_files(int test)
     g_crFile = CreateFileA(g_crPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 }
 
+/* 1.1.0: every DLL/.asi in the game that is not Windows' own and not a SLAM mod:
+   "name:SizeOfImage:where" (g = game folder, s = a subfolder of it, o = elsewhere) - wrappers, old loaders,
+   shot meter cores, overlays. SLAMCrash.exe knows the troublesome ones by name and size. */
+static void crash_extra_dlls(void)
+{
+    char win[MAX_PATH], list[1400], one[160]; int wn, gn = s_len(g_gameDir);
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+    MODULEENTRY32 me;
+    list[0] = 0;
+    wn = (int)GetWindowsDirectoryA(win, MAX_PATH); if (wn <= 0 || wn >= MAX_PATH) wn = 0;
+    if (snap != INVALID_HANDLE_VALUE) {
+        me.dwSize = sizeof(me);
+        if (Module32First(snap, &me)) do {
+            SlamMod *m = mod_by_module(me.hModule); const char *w;
+            if (me.hModule == g_self || (u32)me.hModule == g_exeBase || (m && m->isSlam)) continue;
+            if (wn && memcmp_i(me.szExePath, win, wn) == 0) continue;            /* Windows, drivers */
+            if (gn && memcmp_i(me.szExePath, g_gameDir, gn) == 0) w = s_base(me.szExePath) == me.szExePath + gn ? "g" : "s";
+            else w = "o";
+            s_fmt(one, sizeof(one), "%s:%X:%s", me.szModule, (u32)me.modBaseSize, w);
+            if (s_len(list) + s_len(one) + 2 >= (int)sizeof(list)) break;
+            if (list[0]) s_cat(list, ",", sizeof(list));
+            s_cat(list, one, sizeof(list));
+        } while (Module32Next(snap, &me));
+        CloseHandle(snap);
+    }
+    crash_putf("extra_dlls=%s", list);
+}
+
 static void crash_write(PEXCEPTION_POINTERS ep)
 {
     const EXCEPTION_RECORD *r = ep->ExceptionRecord; const CONTEXT *c = ep->ContextRecord;
@@ -419,7 +447,17 @@ static void crash_write(PEXCEPTION_POINTERS ep)
         }
         crash_putf("mods=%s", list);
         crash_putf("crash_tid=%u", GetCurrentThreadId());
+        /* 1.1.0: game files that could not be opened (a missing/locked file -> the game's lookup returns NULL later) */
+        list[0] = 0;
+        for (k = 0; k < nf; k++) {
+            const char *b = s_base(g_ft[g_ftOrder[k]].path);
+            if (g_ft[g_ftOrder[k]].ok || memcmp_i(b, "ao_", 3) == 0) continue;     /* ao_*.iff: missing in the original game too */
+            if (list[0]) s_cat(list, ",", sizeof(list));
+            s_cat(list, b, sizeof(list));
+        }
+        crash_putf("files_failed=%s", list);
     }
+    crash_extra_dlls();
     crash_put("[/facts]");
     crash_put("");
     /* every file of the trail, newest first: "<ms before the crash>|<thread>|<opened ok>|<times>|<path>" */

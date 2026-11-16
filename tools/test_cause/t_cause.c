@@ -52,6 +52,20 @@ int main(void)
     g_tail = "\r\n[findings]\r\nlog|A|2|ERROR x\r\nlog|B|2|ERROR y\r\n[/findings]\r\n";
     check("log-two", BASE "module=KERNELBASE.dll\n", "no clear cause", "");
     g_tail = "";
+    /* 1.1.0: known crashes and setups from real reports */
+    check("career-old", BASE "module=nba2k14.exe\neip=006172C0\nhooked_near_eip=SigExt\nmods=SigExt 1.10.0,BodyHook 2.1\n", "player table", "");
+    check("career-new", BASE "module=nba2k14.exe\neip=00617331\nmods=SigExt 1.10.4\n", "player table", "SigExt");
+    check("loader", BASE "module=nba2k14.exe\neip=00DD30E0\nthread=other\n", "broken game file", "");
+    check("cloth-old", BASE "module=nba2k14.exe\neip=0045AC55\nhooked_near_stack=BodyHook\nmods=BodyHook 2.1\n", "fixed in BodyHook 2.2.1", "");
+    check("cloth-new", BASE "module=nba2k14.exe\neip=00459F04\nmods=BodyHook 2.2.1\n", "cloth simulation", "BodyHook");
+    check("global", BASE "module=nba2k14.exe\neip=0056EC46\ngame_ready=0\n", "global.iff", "");
+    check("missing", BASE "module=nba2k14.exe\neip=006B6796\naccess=read\ntarget=00000000\nfiles_failed=animgraph_bodyup.iff\n", "missing or could not be opened: animgraph_bodyup.iff", "");
+    check("meter", BASE "module=meter_core.dll\neip=41A4A079\neip_in_module=1\nextra_dlls=meter_core.dll:75000:s,dinput8_next.dll:3C000:g,dinput8.dll:36A000:g\n", "shot meter", "");
+    check("meter-nomod", BASE "module=\neip_in_module=0\nstack_mods=CurvedShotMeter\nextra_dlls=meter_core.dll:7B000:s,CurvedShotMeter.asi:20000:g\n", "shot meter", "");
+    check("wrapper", BASE "module=d3d9.dll\nextra_dlls=d3d9.dll:3F7000:g,dxgi.dll:500000:g\n", "graphics wrapper", "");
+    check("vcrt", BASE "module=MSVCP140.dll\naccess=read\ntarget=00000000\nstack_mods=2K14Hook\n", "Visual C++", "2K14Hook");
+    check("pg", BASE "module=nba2k14.exe\neip=00A88190\naccess=read\ntarget=00000071\n", "point guard", "");
+    check("old-exe-skip", BASE "module=nba2k14.exe\neip=006172C0\nexe_ts=12345678\n", "not the usual version", "");
     printf("\nFAILURES %d\n", fails);
     return fails != 0;
 }

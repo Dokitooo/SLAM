@@ -154,6 +154,9 @@ static int is_problem(const char *mod, const char *s, int n)
     int i;
     if (c_ieq(mod, "SLAM") && (c_ifind(s, n, "] CRASH ") >= 0 || c_ifind(s, n, "] TEST REPORT") >= 0 || c_ifind(s, n, "] EXCEPTION") >= 0 ||
                                c_ifind(s, n, "crash report: on") >= 0 || c_ifind(s, n, "test key") >= 0)) return 0;   /* already in the report */
+    /* normal lines that only contain a problem word: SigExt's stats lines and start-up lines */
+    if (c_ifind(s, n, "own arms:") >= 0 || c_ifind(s, n, "activity:") >= 0 || c_ifind(s, n, "blend:") >= 0 ||
+        c_ifind(s, n, "crash guard") >= 0 || c_ifind(s, n, "row list is NOT sorted") >= 0) return 0;
     for (i = 0; g_problemWords[i]; i++) {
         int off = 0, at;
         while ((at = c_ifind(s + off, n - off, g_problemWords[i])) >= 0) {

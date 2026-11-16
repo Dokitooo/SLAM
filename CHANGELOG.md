@@ -1,5 +1,21 @@
 # SLAM changelog
 
+## 1.1.0
+- **Better crash causes, shorter text.** The crash window now knows the NBA 2K14 crashes seen in real reports and
+  says what to do in a line or two:
+  - MyCareer post-game player table full (interview / recap), the game's file loader on a broken edited file,
+    the cloth simulation (BodyHook bench cloth), broken `global.iff`, files saved with cut rows, a team without a
+    point guard, a broken created-shoe file, a broken MyCareer save.
+  - A game file that could not be opened (missing / renamed / locked) and then used empty - named in the headline.
+  - Shot meter installed twice / with old loader files (root `CurvedShotMeter.asi`, `dinput8_next.dll`, the 3.5 MB
+    `dinput8.dll`), graphics wrappers in the game folder (two ReShades = d3d9.dll + dxgi.dll), a plain .asi that needs
+    a newer Visual C++ runtime.
+  - Our mods that are older than the version that fixed a crash are named ("Also: update ...").
+- Reports have two new `[facts]`: `files_failed` (game files that could not be opened) and `extra_dlls` (every
+  non-Windows DLL/.asi with its size and folder). The crash window no longer counts SigExt's statistics lines,
+  "crash guard" lines or BodyHook's "row list is NOT sorted" as problems.
+- Mods need no update.
+
 ## 1.0.3
 - **ReShade, ENB and other `d3d9.dll` wrappers:** SLAM no longer touches them. When a `d3d9.dll` that is not
   Windows' own is in the game folder, SLAM's mod list (overlay) hooks the Windows `d3d9.dll` underneath it, so the

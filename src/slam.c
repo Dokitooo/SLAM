@@ -23,7 +23,7 @@
  *
  * License: BSD-2-Clause. Hook engine: MinHook (BSD-2), vendored in third_party\minhook.
  */
-#define SLAM_VERSION "1.0.3"
+#define SLAM_VERSION "1.1.0"
 #define SLAM_KNOWN_EXE_TS 0x52202C7Fu          /* the nba2k14.exe build SLAM was made with */
 
 #define WIN32_LEAN_AND_MEAN
