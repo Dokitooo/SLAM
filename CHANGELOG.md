@@ -1,5 +1,14 @@
 # SLAM changelog
 
+## 1.1.1
+- **Two graphics wrappers no longer crash the game.** A ReShade/ENB `d3d9.dll` plus a ReShade/ENB `dxgi.dll` in
+  the game folder load as two ReShades on the same Direct3D device - the game crashed. When both are graphics
+  wrappers, SLAM now loads Windows' own `dxgi.dll` at the game's start (before Direct3D starts), so the game
+  folder's `dxgi.dll` is never loaded; `d3d9.dll` stays. Nothing is moved or deleted. `SLAM.log` names both files.
+  A `d3d9.dll` that is an ASI loader or DXVK, or only one wrapper: unchanged.
+  New setting `[Graphics] OneWrapper=1` (0 = load both, as before); added to an older `SLAM.ini` by itself.
+- Mods need no update.
+
 ## 1.1.0
 - **Better crash causes, shorter text.** The crash window now knows the NBA 2K14 crashes seen in real reports and
   says what to do in a line or two:

@@ -1,8 +1,8 @@
-> **Download:** [SLAM_v1.1.0.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.1.0/SLAM_v1.1.0.zip) (latest release) ·
-> [SLAM_v1.1.0_Extras.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.1.0/SLAM_v1.1.0_Extras.zip) (`SLAM.asi`, HelloSLAM) ·
+> **Download:** [SLAM_v1.1.1.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.1.1/SLAM_v1.1.1.zip) (latest release) ·
+> [SLAM_v1.1.1_Extras.zip](https://github.com/Dokitooo/SLAM/releases/download/v1.1.1/SLAM_v1.1.1_Extras.zip) (`SLAM.asi`, HelloSLAM) ·
 > [all releases](https://github.com/Dokitooo/SLAM/releases)
 
-# SLAM 1.1.0 — Script Loader & Add-on Manager for NBA 2K14 (PC)
+# SLAM 1.1.1 — Script Loader & Add-on Manager for NBA 2K14 (PC)
 
 SLAM loads mods for NBA 2K14, the way CLEO does for GTA San Andreas. Mods like **BodyHook**,
 **CrowdTune**, **NosebleedCam** and **SigExt** need it. It also writes a crash report when the
@@ -35,7 +35,7 @@ Then put SLAM mods into `SLAM\`, each mod in its own folder:
         CrowdTune\CrowdTune.asi
 ```
 
-Want to check that it works? From `SLAM_v1.1.0_Extras.zip`, copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
+Want to check that it works? From `SLAM_v1.1.1_Extras.zip`, copy `Extras\SLAM\HelloSLAM` into your `SLAM\` folder: it's a
 small example mod that only writes `SLAM\HelloSLAM\HelloSLAM.log` (delete it afterwards).
 
 Start the game. `SLAM\SLAM.log` lists what was loaded. `SLAM\SLAM.ini` is created on the first
@@ -53,7 +53,7 @@ its own loader) or another mod:
   `CurvedShotMeter.asi` and its `CurvedShotMeter\` folder: SLAM 1.0.2 starts it by itself.
 
 **Already use another ASI loader** (e.g. Ultimate ASI Loader as `winmm.dll` or `d3d9.dll`)?
-Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` from `SLAM_v1.1.0_Extras.zip` into your `scripts\` folder instead, and
+Don't use SLAM's `dinput8.dll`. Put `Extras\SLAM.asi` from `SLAM_v1.1.1_Extras.zip` into your `scripts\` folder instead, and
 keep `SLAM\SLAMCrash.exe` as above.
 
 ## NBA 2K14 in Program Files
@@ -106,12 +106,22 @@ They are listed in `SLAM.log` as "plain .asi" (one that exports `InitializeASI`,
 Loader way, gets it called - 1.0.2). SLAM just can't check their version or
 coordinate their changes with other mods.
 
+## ReShade, ENB, SweetFX, FXAA
+
+Put the wrapper's `d3d9.dll` next to `nba2k14.exe`, beside SLAM's `dinput8.dll`. SLAM doesn't touch it.
+**Two wrappers crash the game** - most often a ReShade `d3d9.dll` plus a ReShade `dxgi.dll` (left over from
+another install or a newer ReShade). Since 1.1.1 SLAM keeps the game folder's `dxgi.dll` out when both are
+graphics wrappers: Windows' own `dxgi.dll` is used in its place and `d3d9.dll` (the one made for Direct3D 9
+games like NBA 2K14) stays. Nothing is moved or deleted. `SLAM.log` says so ("graphics: TWO wrappers ...").
+A `d3d9.dll` that is an ASI loader or DXVK, or a single wrapper, is left exactly as it is.
+`[Graphics] OneWrapper=0` in `SLAM.ini` = load both, as before.
+
 ## The mod list at start
 
 For 3 seconds after the game window appears, the top left shows what SLAM loaded:
 
 ```
-SLAM 1.1.0
+SLAM 1.1.1
 BodyHook 1.19.9      SLAM
 CrowdTune 1.5.1      SLAM
 SomeOldMod           plain .asi
@@ -146,6 +156,9 @@ Ask=1            ; game in Program Files: offer the fix at start (0 = don't ask)
 [Overlay]
 Show=1           ; list of loaded mods at the top left when the game starts
 Seconds=3        ; for how long
+
+[Graphics]
+OneWrapper=1     ; ReShade/ENB as d3d9.dll AND as dxgi.dll in the game folder: use only d3d9.dll (0 = both)
 ```
 
 Delete `SLAM.ini` to get the defaults back. Settings an older `SLAM.ini` doesn't have yet are added to it
@@ -226,5 +239,5 @@ Each SLAM mod also writes its own log to `SLAM\<Mod>\<Mod>.log`.
 
 ---
 
-SLAM 1.1.0 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
+SLAM 1.1.1 — © 2026 Alexiconn2K — free and open source (BSD 2-Clause, see `LICENSE.txt`).
 Uses MinHook by Tsuda Kageyu (BSD 2-Clause). Mod makers: see `SDK\SDK.md`.

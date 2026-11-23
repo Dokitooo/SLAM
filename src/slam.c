@@ -23,7 +23,7 @@
  *
  * License: BSD-2-Clause. Hook engine: MinHook (BSD-2), vendored in third_party\minhook.
  */
-#define SLAM_VERSION "1.1.0"
+#define SLAM_VERSION "1.1.1"
 #define SLAM_KNOWN_EXE_TS 0x52202C7Fu          /* the nba2k14.exe build SLAM was made with */
 
 #define WIN32_LEAN_AND_MEAN
@@ -81,6 +81,7 @@ static void overlay_install(void);
 #include "log.inc"
 #include "folder.inc"
 #include "hooks.inc"
+#include "graphics.inc"
 #include "loader.inc"
 #include "crash.inc"
 #include "overlay.inc"
@@ -124,7 +125,12 @@ static const char kDefaultIni[] =
     "; 1 = show the list of loaded mods at the top left when the game starts\r\n"
     "Show=1\r\n"
     "; for how many seconds\r\n"
-    "Seconds=3\r\n";
+    "Seconds=3\r\n"
+    "\r\n"
+    "[Graphics]\r\n"
+    "; 1 = when the game folder has two graphics wrappers (ReShade/ENB as d3d9.dll AND as dxgi.dll), use only\r\n"
+    ";     d3d9.dll - two ReShades crash the game. Nothing is moved or deleted. 0 = load both\r\n"
+    "OneWrapper=1\r\n";
 
 static void ini_add(const char *sec, const char *key, const char *val)
 {
@@ -145,10 +151,12 @@ static void config_load(void)
     ini_add("Overlay", "Show", "1"); ini_add("Overlay", "Seconds", "3");
     ini_add("Crash", "TestKey", "Ctrl+F11"); ini_add("Crash", "TestCloses", "0");
     ini_add("Folder", "Ask", "1");
+    ini_add("Graphics", "OneWrapper", "1");
     GetPrivateProfileStringA("Mods", "LoadFirst", "", g_cfgLoadFirst, sizeof(g_cfgLoadFirst), g_iniPath);
     GetPrivateProfileStringA("Mods", "Disabled", "", g_cfgDisabled, sizeof(g_cfgDisabled), g_iniPath);
     crash_config(g_iniPath);
     overlay_config(g_iniPath);
+    graphics_config(g_iniPath);
 }
 
 /* ---- dinput8 proxy ------------------------------------------------------------------------------ */
@@ -234,6 +242,7 @@ static DWORD WINAPI slam_thread(LPVOID unused)
                 if (g_mods[i].isSlam && (g_mods[i].nHooks || g_mods[i].nPatches))
                     slog("mods: %s uses %d hook(s), %d patch(es)", g_mods[i].name, (int)g_mods[i].nHooks, (int)g_mods[i].nPatches);
             slog("summary: %d conflict(s)%s", g_conflictN, g_conflictN ? " - see the CONFLICT lines above" : "");
+            graphics_check();
         }
     }
 }
