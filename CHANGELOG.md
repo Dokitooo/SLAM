@@ -1,5 +1,17 @@
 # SLAM changelog
 
+## 1.1.2
+- **The copied report has everything.** Crash reports now end with a `[memory]` block - what the `.dmp`
+  holds, as text: the code bytes around the crash, the crashing thread's stack (up to 4 KB, zero runs
+  folded), the memory at every register and at the first 24 data pointers on the stack - and one step
+  further (what the pointers inside those point to), where every other thread is with its last calls,
+  and every loaded module (base, size, date stamp, path). Players only press **Copy report** and paste;
+  Discord turns a long paste into a `message.txt` by itself.
+- The `.dmp` is still written. **Copy crash file (.zip)** (second button) copies one zip with the report,
+  the dump and `SLAM.log` (paste it like a file), for when a mod author asks for the full dump. Old zips are
+  cleaned up with the old reports (`[Crash] Keep`).
+- Includes 1.1.1 (one graphics wrapper). Mods need no update.
+
 ## 1.1.1
 - **Two graphics wrappers no longer crash the game.** A ReShade/ENB `d3d9.dll` plus a ReShade/ENB `dxgi.dll` in
   the game folder load as two ReShades on the same Direct3D device - the game crashed. When both are graphics

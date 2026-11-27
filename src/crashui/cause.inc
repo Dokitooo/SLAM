@@ -296,7 +296,7 @@ static int known_crash(const CauseFacts *fx, const CauseExtra *cx, CauseResult *
         head(r, 2, "Known NBA 2K14 bug: MyCareer's player table for the game was full (post-game interview / recap).", 0, 0);
         if (fixed) {
             say(r, "Your SigExt already has the fix for this, so this is a new variant." NL);
-            tryit(r); tip(r, "Send this report (and the .dmp) to the SigExt author.");
+            tryit(r); tip(r, "Send this report to the SigExt author.");
             blame(r, "SigExt");
         } else {
             tryit(r); tip(r, "Update the NBA2K27 ANIMATIONS pack (SigExt 1.10.4 or newer fixes it).");
@@ -322,7 +322,7 @@ static int known_crash(const CauseFacts *fx, const CauseExtra *cx, CauseResult *
             head(r, 1, "The cloth simulation got a broken cloth object (BodyHook's own cloth or the bench).", 0, 0);
             tryit(r);
             tip(r, "BodyHook.ini [Bench] Lite=1, and put back the original cloth_*.iff files.");
-            tip(r, "Send this report (and the .dmp) to the BodyHook author.");
+            tip(r, "Send this report to the BodyHook author.");
             blame(r, "BodyHook");
         } else {
             head(r, 1, "The cloth simulation got a broken cloth object.", 0, 0);

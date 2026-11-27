@@ -364,6 +364,158 @@ static void crash_extra_dlls(void)
     crash_putf("extra_dlls=%s", list);
 }
 
+/* 1.1.2: what the .dmp is needed for, as text in the report itself ([memory] block): code around eip,
+   4 KB of the crashing stack, the memory at every register and at the data pointers on the stack - and one
+   step further (the pointers inside those), every other thread's place and calls, and all loaded modules.
+   "Copy report" then carries nearly everything the dump has. Static buffers only - no heap at crash time. */
+static void crash_hexline(const char *label, u32 a, int dwords)
+{
+    char line[200]; int k, L; u32 v;
+    L = wsprintfA(line, "    %-10s %08X:", label, a);
+    for (k = 0; k < dwords; k++) {
+        if (read32(a + 4 * k, &v)) L += wsprintfA(line + L, " %08X", v);
+        else L += wsprintfA(line + L, " ????????");
+    }
+    crash_put(line);
+}
+static u32 g_mSeen[160]; static int g_mSeenN, g_mDeep;
+static u32 g_mLo, g_mHi;                            /* crashing thread's stack: not "data" */
+static int mem_seen(u32 a) { int i; for (i = 0; i < g_mSeenN; i++) if (g_mSeen[i] == a) return 1; if (g_mSeenN < 160) g_mSeen[g_mSeenN++] = a; return 0; }
+static int mem_is_data(u32 a)
+{
+    return a >= 0x10000 && !(a >= g_mLo && a < g_mHi) && !crash_is_code(a) && mem_readable((const void *)a, 32);
+}
+/* `a`: 32 bytes, then (depth 1) the data pointers inside them, 32 bytes each */
+static void mem_follow(const char *label, u32 a, int depth)
+{
+    u32 v; int k;
+    crash_hexline(label, a, 8);
+    if (depth >= 2) return;
+    for (k = 0; k < 8 && g_mDeep < 96; k++)
+        if (read32(a + 4 * k, &v) && mem_is_data(v) && !mem_seen(v)) {
+            char l2[16]; wsprintfA(l2, "  ->+%02X", 4 * k);
+            g_mDeep++;
+            mem_follow(l2, v, depth + 1);
+        }
+}
+typedef struct { u32 tid, eip, esp, ebp, n, ret[10]; } ThrSnap;
+static ThrSnap g_thr[64];
+static void crash_threads(void)
+{
+    THREADENTRY32 te; HANDLE snap; int n = 0, i, k; DWORD pid = GetCurrentProcessId(), me = GetCurrentThreadId();
+    snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snap == INVALID_HANDLE_VALUE) return;
+    te.dwSize = sizeof(te);
+    if (Thread32First(snap, &te)) do {
+        HANDLE t; CONTEXT tc; ThrSnap *s;
+        if (te.th32OwnerProcessID != pid || te.th32ThreadID == me || n >= 64) continue;
+        t = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, te.th32ThreadID);
+        if (!t) continue;
+        s = &g_thr[n];
+        s->tid = te.th32ThreadID; s->n = 0; s->eip = s->esp = s->ebp = 0;
+        if (SuspendThread(t) != (DWORD)-1) {
+            /* only numbers while it is stopped: names need locks the stopped thread may hold */
+            memset(&tc, 0, sizeof(tc));
+            tc.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+            if (GetThreadContext(t, &tc)) {
+                u32 v;
+                s->eip = tc.Eip; s->esp = tc.Esp; s->ebp = tc.Ebp;
+                for (k = 0; k < 0x800 && s->n < 10; k += 4)
+                    if (read32(tc.Esp + k, &v) && v >= 0x10000 && crash_is_code(v)) s->ret[s->n++] = v;
+            }
+            ResumeThread(t);
+            n++;
+        }
+        CloseHandle(t);
+    } while (Thread32Next(snap, &te));
+    CloseHandle(snap);
+    crash_putf("  other threads (%d) - where each one is and its last calls:", n);
+    for (i = 0; i < n; i++) {
+        char w[200], line[1100]; int L;
+        crash_where(g_thr[i].eip, w, sizeof(w));
+        crash_putf("    thread %u  eip %08X %s  esp %08X", g_thr[i].tid, g_thr[i].eip, w, g_thr[i].esp);
+        if (!g_thr[i].n) continue;
+        L = wsprintfA(line, "      calls:");
+        for (k = 0; k < (int)g_thr[i].n; k++) {
+            char m[80]; crash_modname(g_thr[i].ret[k], m, sizeof(m));
+            if (m[0]) { HMODULE h = mod_of(g_thr[i].ret[k]); L += wsprintfA(line + L, " %s+%X", m, g_thr[i].ret[k] - (u32)h); }
+            else L += wsprintfA(line + L, " %08X", g_thr[i].ret[k]);
+            if (L > 1000) break;
+        }
+        crash_put(line);
+    }
+}
+static void crash_modules(void)
+{
+    MODULEENTRY32 me; HANDLE snap; char win[MAX_PATH]; int wl, n = 0;
+    GetWindowsDirectoryA(win, MAX_PATH); wl = s_len(win);
+    snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+    if (snap == INVALID_HANDLE_VALUE) return;
+    crash_put("  loaded modules (base, size, PE date stamp; Windows' own as name only):");
+    me.dwSize = sizeof(me);
+    if (Module32First(snap, &me)) do {
+        u32 b = (u32)me.modBaseAddr, ts = 0, lf;
+        int isWin = wl && s_len(me.szExePath) > wl && !memcmp_i(me.szExePath, win, wl);
+        if (read32(b + 0x3C, &lf) && lf < 0x1000) read32(b + lf + 8, &ts);
+        crash_putf("    %08X %8X %08X  %s", b, me.modBaseSize, ts, isWin ? me.szModule : me.szExePath);
+        n++;
+    } while (Module32Next(snap, &me) && n < 300);
+    CloseHandle(snap);
+}
+static void crash_memory(const CONTEXT *c, u32 eip)
+{
+    static const char *const rn[] = { "eax", "ebx", "ecx", "edx", "esi", "edi", "ebp" };
+    u32 rv[7], v, a, top = c->Esp + 0x1000; int i, k, ns = 0;
+    MEMORY_BASIC_INFORMATION mb;
+    char lbl[24];
+    g_mSeenN = 0; g_mDeep = 0;
+    if (VirtualQuery((LPCVOID)c->Esp, &mb, sizeof(mb))) {
+        g_mLo = (u32)mb.AllocationBase; g_mHi = (u32)mb.BaseAddress + (u32)mb.RegionSize;
+        if (g_mHi < top) top = g_mHi;                               /* never past the thread's stack */
+    } else { g_mLo = c->Esp - 0x10000; g_mHi = top; }
+    rv[0] = c->Eax; rv[1] = c->Ebx; rv[2] = c->Ecx; rv[3] = c->Edx; rv[4] = c->Esi; rv[5] = c->Edi; rv[6] = c->Ebp;
+    crash_put("");
+    crash_put("[memory]  (what the .dmp has, as text - for the mod author; 8 dwords per line)");
+    if (mem_readable((const void *)(eip - 32), 64)) {
+        const u8 *b = (const u8 *)(eip - 32);
+        crash_put("  code bytes around eip (eip-32 .. eip+31):");
+        for (k = 0; k < 64; k += 16)
+            crash_putf("    %08X: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X%s",
+                       eip - 32 + k, b[k], b[k + 1], b[k + 2], b[k + 3], b[k + 4], b[k + 5], b[k + 6], b[k + 7],
+                       b[k + 8], b[k + 9], b[k + 10], b[k + 11], b[k + 12], b[k + 13], b[k + 14], b[k + 15], k == 32 ? "   <- eip" : "");
+    }
+    {   /* the stack; runs of zero lines shown as one line */
+        u32 zeros = 0, z, j;
+        crash_putf("  stack (esp .. esp+%03X):", top > c->Esp ? top - c->Esp - 1 : 0);
+        for (k = 0; c->Esp + k + 32 <= top; k += 32) {
+            for (z = 1, j = 0; j < 8; j++) if (!read32(c->Esp + k + 4 * j, &v) || v) { z = 0; break; }
+            if (z) { zeros++; continue; }
+            if (zeros) { crash_putf("    (%u line%s of zeros)", zeros, zeros > 1 ? "s" : ""); zeros = 0; }
+            wsprintfA(lbl, "esp+%03X", k);
+            crash_hexline(lbl, c->Esp + k, 8);
+        }
+        if (zeros) crash_putf("    (%u line%s of zeros)", zeros, zeros > 1 ? "s" : "");
+    }
+    crash_put("  memory at the registers (from reg-16; '->+NN' = what the pointer at that offset points to):");
+    for (i = 0; i < 7; i++) {
+        a = rv[i];
+        if (a < 0x10000 || !mem_readable((const void *)(a - 16), 64)) continue;
+        mem_seen(a);
+        mem_follow(rn[i], a - 16, 1);
+        mem_follow("", a + 16, 1);
+    }
+    crash_put("  memory at the data pointers on the stack (first 24 in esp .. esp+3FF):");
+    for (k = 0; k < 0x400 && ns < 24 && c->Esp + k + 4 <= top; k += 4) {
+        if (!read32(c->Esp + k, &a) || !mem_is_data(a) || mem_seen(a)) continue;
+        ns++;
+        wsprintfA(lbl, "[esp+%03X]", k);
+        mem_follow(lbl, a, 1);
+    }
+    crash_threads();
+    crash_modules();
+    crash_put("[/memory]");
+}
+
 static void crash_write(PEXCEPTION_POINTERS ep)
 {
     const EXCEPTION_RECORD *r = ep->ExceptionRecord; const CONTEXT *c = ep->ContextRecord;
@@ -547,6 +699,7 @@ static void crash_write(PEXCEPTION_POINTERS ep)
                        crash_name(g_exc[k].code) ? crash_name(g_exc[k].code) : "?", g_exc[k].eip, where, g_exc[k].tid);
         }
     }
+    crash_memory(c, eip);
     FlushFileBuffers(g_crFile);
 
     if (g_crDump && g_miniDump && !test) {
@@ -562,7 +715,7 @@ static void crash_write(PEXCEPTION_POINTERS ep)
         }
     }
     crash_put("");
-    crash_put("Please send this file (and the .dmp next to it) to the mod author named above.");
+    crash_put("Please copy this whole report (crash window: Copy report) and send it to the mod author named above. It has everything they need; the crash .zip next to this file has the full dump if they ask for it.");
     CloseHandle(g_crFile); g_crFile = INVALID_HANDLE_VALUE;
 
     crash_slog("%s %s at %08X %s - report: %s", test ? "TEST REPORT" : "CRASH", crash_name(code) ? crash_name(code) : "exception", eip, where, g_crPath);
@@ -647,6 +800,7 @@ static void crash_prune(void)
         s_cpy(p, g_slamDir, MAX_PATH); s_cat(p, "crash\\", MAX_PATH); s_cat(p, names[i], MAX_PATH);
         k = s_len(p); s_cat(p, ".log", MAX_PATH); DeleteFileA(p);
         p[k] = 0; s_cat(p, ".dmp", MAX_PATH); DeleteFileA(p);
+        p[k] = 0; s_cat(p, ".zip", MAX_PATH); DeleteFileA(p);          /* 1.1.2 */
     }
 }
 

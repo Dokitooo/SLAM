@@ -41,3 +41,9 @@ EXPORTS
     WideCharToMultiByte@32
     WriteFile@20
     lstrcmpiW@8
+FileTimeToDosDateTime@12
+DeleteFileA@4
+MoveFileA@8
+MultiByteToWideChar@24
+FileTimeToLocalFileTime@8
+GetFileTime@16

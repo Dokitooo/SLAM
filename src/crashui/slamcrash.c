@@ -8,7 +8,10 @@
  * First it adds what it finds on disk to the report, once (findings.inc): changed game files the
  * game loaded, problem lines and last lines of the mods' logs, probe builds still installed.
  * Top: the likely cause in plain words (from the report's [facts] block, see cause.inc) and who
- * to send it to. Below: the whole report. Buttons: Copy report, Open crash folder, Close.
+ * to send it to. Below: the whole report. Buttons: Copy crash file, Copy report text, Open crash
+ * folder, Close. 1.1.2: the report, the dump and SLAM.log go into ONE crash_....zip (zip.inc); "Copy crash
+ * file" puts that file on the clipboard. 1.1.3: the report itself carries the dump's useful part ([memory]),
+ * so "Copy report" (first button again) is all a player needs to send.
  * It is a separate program because a crashed game can't be trusted to draw a window.
  * No C runtime; imports kernel32, user32, gdi32, shell32, advapi32 (1.0.1) only.
  */
@@ -19,6 +22,7 @@
 #define ID_COPY   101
 #define ID_FOLDER 102
 #define ID_CLOSE  103
+#define ID_COPYZIP 104
 #define ID_TIMER  1
 
 static char g_path[MAX_PATH];
@@ -27,7 +31,8 @@ static CauseFacts g_fx;
 static CauseExtra g_cx;
 static CauseResult g_cause;
 static char g_causeText[7600];           /* headline + body, for the copy button and the edit */
-static HWND g_wnd, g_head, g_causeEdit, g_who, g_label, g_log, g_btn[3];
+static HWND g_wnd, g_head, g_causeEdit, g_who, g_label, g_log, g_btn[4];
+static char g_zip[MAX_PATH];             /* 1.1.2: crash_....zip, "" if it could not be made */
 static HFONT g_fUi, g_fBold, g_fMono;
 static int g_dpi = 96;
 static int g_test;
@@ -42,6 +47,7 @@ static int px(int v) { return MulDiv(v, g_dpi, 96); }
 static void s_cpy(char *d, const char *s, int cap) { int i = 0; for (; s[i] && i < cap - 1; i++) d[i] = s[i]; d[i] = 0; }
 #include "findings.inc"
 #include "grant.inc"
+#include "zip.inc"
 
 /* ---- the report file -------------------------------------------------------------------------- */
 static char *read_text(const char *path)
@@ -113,24 +119,51 @@ static void copy_report(void)
     *p++ = '\r'; *p++ = '\n'; *p++ = '\r'; *p++ = '\n';
     for (i = 0; i < b; i++) *p++ = g_report[i];
     *p = 0;
+
     GlobalUnlock(mem);
     EmptyClipboard();
     if (!SetClipboardData(CF_TEXT, mem)) GlobalFree(mem);
     CloseClipboard();
-    SetWindowTextA(g_btn[0], "Copied!");
+    SetWindowTextA(g_btn[0], "Copied - now paste (Ctrl+V)");
+}
+
+/* 1.1.2: the crash .zip itself on the clipboard (like Copy in Explorer) - CF_HDROP = DROPFILES + paths */
+typedef struct { DWORD pFiles; POINT pt; BOOL fNC; BOOL fWide; } SC_DROPFILES;
+#define DROPFILES SC_DROPFILES
+static void copy_zip(void)
+{
+    WCHAR wz[MAX_PATH]; int n, i; HGLOBAL mem, eff; DROPFILES *df; UINT cfEff;
+    if (!g_zip[0]) return;
+    n = MultiByteToWideChar(CP_ACP, 0, g_zip, -1, wz, MAX_PATH);
+    if (n <= 0) return;
+    mem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DROPFILES) + (SIZE_T)(n + 1) * sizeof(WCHAR));
+    if (!mem) return;
+    df = (DROPFILES *)GlobalLock(mem);
+    df->pFiles = sizeof(DROPFILES); df->fWide = TRUE;
+    { WCHAR *d = (WCHAR *)((char *)df + sizeof(DROPFILES)); for (i = 0; i < n; i++) d[i] = wz[i]; d[n] = 0; }
+    GlobalUnlock(mem);
+    cfEff = RegisterClipboardFormatA("Preferred DropEffect");
+    eff = GlobalAlloc(GMEM_MOVEABLE, sizeof(DWORD));
+    if (eff) { *(DWORD *)GlobalLock(eff) = 1 /* DROPEFFECT_COPY */; GlobalUnlock(eff); }
+    if (!OpenClipboard(g_wnd)) { GlobalFree(mem); if (eff) GlobalFree(eff); return; }
+    EmptyClipboard();
+    if (!SetClipboardData(CF_HDROP, mem)) GlobalFree(mem);
+    if (eff && !SetClipboardData(cfEff, eff)) GlobalFree(eff);
+    CloseClipboard();
+    SetWindowTextA(g_btn[3], "File copied - paste it");
 }
 
 static void open_folder(void)
 {
     char args[MAX_PATH + 16];
-    s_cpy(args, "/select,\"", sizeof(args)); c_cat(args, g_path, sizeof(args)); c_cat(args, "\"", sizeof(args));
+    s_cpy(args, "/select,\"", sizeof(args)); c_cat(args, g_zip[0] ? g_zip : g_path, sizeof(args)); c_cat(args, "\"", sizeof(args));
     ShellExecuteA(g_wnd, "open", "explorer.exe", args, NULL, SW_SHOWNORMAL);
 }
 
 /* ---- layout ----------------------------------------------------------------------------------- */
 static void layout(int w, int h)
 {
-    int m = px(12), y = m, bw = px(130), bh = px(28), headH = px(24), causeH = px(150), whoH = g_cause.blame[0] ? px(22) : 0, lblH = px(20);
+    int m = px(12), y = m, bw = px(130), bh = px(28), headH = px(24), causeH = px(150), whoH = px(22), lblH = px(20);
     int logY, logH;
     MoveWindow(g_head, m, y, w - 2 * m, headH, TRUE);          y += headH + px(4);
     MoveWindow(g_causeEdit, m, y, w - 2 * m, causeH, TRUE);    y += causeH + px(6);
@@ -139,9 +172,10 @@ static void layout(int w, int h)
     logY = y; logH = h - logY - bh - 2 * m;
     if (logH < px(40)) logH = px(40);
     MoveWindow(g_log, m, logY, w - 2 * m, logH, TRUE);
-    MoveWindow(g_btn[2], w - m - bw, h - m - bh, bw, bh, TRUE);
-    MoveWindow(g_btn[1], w - 2 * m - 2 * bw, h - m - bh, bw, bh, TRUE);
-    MoveWindow(g_btn[0], m, h - m - bh, bw, bh, TRUE);
+    MoveWindow(g_btn[2], w - m - bw, h - m - bh, bw, bh, TRUE);                          /* Close */
+    MoveWindow(g_btn[1], w - 2 * m - 2 * bw, h - m - bh, bw, bh, TRUE);                  /* Open crash folder */
+    MoveWindow(g_btn[0], m, h - m - bh, px(200), bh, TRUE);                              /* Copy report */
+    MoveWindow(g_btn[3], m + px(200) + px(8), h - m - bh, px(160), bh, TRUE);           /* Copy crash file */
 }
 
 static HWND child(const char *cls, const char *text, DWORD style, int id, HFONT f)
@@ -162,16 +196,18 @@ static LRESULT CALLBACK wndproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
         who[0] = 0;
         if (g_cause.blame[0]) {
             char nice[300]; c_nice_list(nice, g_cause.blame, sizeof(nice));
-            c_cat(who, "Send this report to the author of: ", sizeof(who)); c_cat(who, nice, sizeof(who));
-        }
+            c_cat(who, "Press Copy report and send it to the author of: ", sizeof(who)); c_cat(who, nice, sizeof(who));
+        } else c_cat(who, "Press Copy report and paste it to the mod author - it has everything they need", sizeof(who));
         g_who = child("STATIC", who, SS_LEFT | SS_NOPREFIX, 0, g_fBold);
         g_label = child("STATIC", "Full report (for the mod author):", SS_LEFT | SS_NOPREFIX, 0, g_fUi);
         g_log = child("EDIT", "", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL | WS_BORDER, 0, g_fMono);
         SendMessageA(g_log, EM_SETLIMITTEXT, 0, 0);
         SetWindowTextA(g_log, g_report);
-        g_btn[0] = child("BUTTON", "Copy report", BS_PUSHBUTTON, ID_COPY, g_fUi);
+        g_btn[0] = child("BUTTON", "Copy report", BS_PUSHBUTTON, ID_COPY, g_fBold);
         g_btn[1] = child("BUTTON", "Open crash folder", BS_PUSHBUTTON, ID_FOLDER, g_fUi);
         g_btn[2] = child("BUTTON", "Close", BS_DEFPUSHBUTTON, ID_CLOSE, g_fUi);
+        g_btn[3] = child("BUTTON", "Copy crash file (.zip)", BS_PUSHBUTTON, ID_COPYZIP, g_fUi);
+        if (!g_zip[0]) ShowWindow(g_btn[3], SW_HIDE);
         SetTimer(w, ID_TIMER, 2500, NULL);
         return 0;
     }
@@ -192,6 +228,7 @@ static LRESULT CALLBACK wndproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
     case WM_COMMAND:
         switch (LOWORD(wp)) {
         case ID_COPY: copy_report(); return 0;
+        case ID_COPYZIP: copy_zip(); return 0;
         case ID_FOLDER: open_folder(); return 0;
         case ID_CLOSE: case IDCANCEL: case IDOK: DestroyWindow(w); return 0;
         }
@@ -263,6 +300,7 @@ void __stdcall start(void)
         char *again = read_text(g_path);
         if (again) { VirtualFree(g_report, 0, MEM_RELEASE); g_report = again; }
     }
+    if (!make_bundle(g_path, g_zip)) g_zip[0] = 0;     /* 1.1.2: report + dump + SLAM.log in one .zip */
     cause_parse(g_report, &g_fx);
     cause_extra(g_report, &g_cx);
     cause_guess(&g_fx, &g_cx, &g_cause);
@@ -288,7 +326,7 @@ void __stdcall start(void)
     if (!g_wnd) ExitProcess(1);
     SetForegroundWindow(g_wnd);
     FlashWindow(g_wnd, TRUE);
-    SetFocus(g_btn[2]);
+    SetFocus(g_btn[0]);
     if (!g_test) MessageBeep(MB_ICONERROR);
 
     while (GetMessageA(&msg, NULL, 0, 0) > 0) {
