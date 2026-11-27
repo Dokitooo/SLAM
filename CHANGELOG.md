@@ -1,5 +1,17 @@
 # SLAM changelog
 
+## 1.1.4
+- **SweetFX, FXAA and any graphics wrapper as `dxgi.dll`.** SweetFX packs (the 2012 SMAA/FXAA injector) ship a
+  `dxgi.dll` next to their `d3d9.dll`, and players copy both. NBA 2K14 is Direct3D 9 and never uses `dxgi.dll` -
+  but Windows 10/11's `d3d9.dll` loads `dxgi.dll` while Direct3D starts, so that Direct3D 10/11 injector (or a
+  second ReShade) ended up inside the game: crash or no game window. SLAM now keeps ANY known graphics wrapper
+  named `dxgi.dll` out (ReShade, ENB, SweetFX/SMAA/FXAA injector) - also when the `d3d9.dll` is not a wrapper -
+  by loading Windows' own `dxgi.dll` first. The game folder's `d3d9.dll` (ReShade / ENB / SweetFX / FXAA) works
+  as without SLAM. Nothing is moved or deleted; DXVK and unknown files are left alone. `[Graphics] OneWrapper=0`
+  = off.
+- `SLAM.log` names what is in the game folder ("graphics: d3d9.dll in the game folder: SweetFX ...").
+- Includes 1.1.2 (report with `[memory]`). Mods need no update.
+
 ## 1.1.2
 - **The copied report has everything.** Crash reports now end with a `[memory]` block - what the `.dmp`
   holds, as text: the code bytes around the crash, the crashing thread's stack (up to 4 KB, zero runs

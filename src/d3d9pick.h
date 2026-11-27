@@ -83,7 +83,7 @@ static HMODULE d3d9_pick(char *why, int whyLen)
     }
     if (why) {
         dp_cpy(why, "d3d9: ", whyLen);
-        dp_cat(why, dp_has(g, "reshade") ? "ReShade" : dp_has(g, "enbseries") ? "ENB" : "a d3d9 wrapper", whyLen);
+        dp_cat(why, dp_has(g, "reshade") ? "ReShade" : dp_has(g, "enbseries") ? "ENB" : dp_has(g, "injector.ini") ? "SweetFX (SMAA/FXAA injector)" : "a d3d9 wrapper", whyLen);
         dp_cat(why, " in the game folder (", whyLen); dp_cat(why, gp, whyLen);
         dp_cat(why, ") - hooking the Windows d3d9 under it, the wrapper itself is not touched", whyLen);
     }

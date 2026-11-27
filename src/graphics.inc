@@ -40,39 +40,61 @@ static int gx_file_has(const char *path, const char *const *t, char *which, int 
 static int g_cfgOneWrapper = 1;
 static void graphics_config(const char *ini) { g_cfgOneWrapper = GetPrivateProfileIntA("Graphics", "OneWrapper", 1, ini) != 0; }
 
+/* 1.1.4: what a game-folder d3d9.dll / dxgi.dll is, for the log ("" = not a known graphics tool) */
+static const char *gx_kind(const char *path)
+{
+    static const char *const kReshade[] = { "reshade", 0 }, *const kEnb[] = { "enbseries", 0 }, *const kDxvk[] = { "dxvk", 0 };
+    static const char *const kSweet[] = { "injector.ini", "sweetfx", "injectfx", "shaderinjector", "injectsmaa", 0 };
+    static const char *const kFxaa[] = { "fxaa", "d3d9sweet", 0 };
+    if (!file_exists(path)) return 0;
+    if (gx_file_has(path, kDxvk, 0, 0)) return "DXVK";
+    if (gx_file_has(path, kReshade, 0, 0)) return "ReShade";
+    if (gx_file_has(path, kEnb, 0, 0)) return "ENB";
+    if (gx_file_has(path, kSweet, 0, 0)) return "SweetFX (SMAA/FXAA injector)";
+    if (gx_file_has(path, kFxaa, 0, 0)) return "FXAA injector";
+    return "";
+}
+
+/* 1.1.1: two wrappers -> keep d3d9.dll. 1.1.4: ANY graphics wrapper as dxgi.dll is kept out.
+ * NBA 2K14 is Direct3D 9 and never uses dxgi.dll itself - but Windows' d3d9.dll (Windows 10/11) loads dxgi.dll while
+ * Direct3D starts, so a dxgi.dll in the game folder ends up inside Direct3D 9: a second ReShade, or SweetFX's 2012
+ * SMAA injector dxgi.dll (it rewrites CreateDXGIFactory for Direct3D 10/11 games - SweetFX packs ship it next to
+ * their d3d9.dll and players copy both) - and the game crashes or never shows its window. So SLAM loads Windows' own
+ * dxgi.dll first, by its full path, at the game's entry point: the game folder's dxgi.dll is never loaded, nothing
+ * is moved or deleted. d3d9.dll (ReShade / ENB / SweetFX / FXAA injector made for D3D9 games) works as without SLAM.
+ * DXVK and unknown dxgi.dll files are left alone. [Graphics] OneWrapper=0 = off. */
 static void graphics_guard(void)
 {
-    static const char *const kD3d9[] = { "reshade", "enbseries", "sweetfx", "d3d9sweet", "injectfx", "fxaa", 0 };
-    static const char *const kDxgi[] = { "reshade", "enbseries", 0 };
-    static const char *const kDxvk[] = { "dxvk", 0 };
-    char d3d9[MAX_PATH], dxgi[MAX_PATH], sys[MAX_PATH], have[MAX_PATH], w1[32], w2[32];
+    char d3d9[MAX_PATH], dxgi[MAX_PATH], sys[MAX_PATH], have[MAX_PATH];
+    const char *k9, *kx;
     HMODULE m;
     s_cpy(d3d9, g_gameDir, MAX_PATH); s_cat(d3d9, "d3d9.dll", MAX_PATH);
     s_cpy(dxgi, g_gameDir, MAX_PATH); s_cat(dxgi, "dxgi.dll", MAX_PATH);
-    if (!file_exists(d3d9) || !file_exists(dxgi)) return;
-    if (!gx_file_has(dxgi, kDxgi, w2, sizeof w2)) { slog("graphics: dxgi.dll in the game folder is not ReShade/ENB - left alone"); return; }
-    if (gx_file_has(d3d9, kDxvk, 0, 0) || !gx_file_has(d3d9, kD3d9, w1, sizeof w1)) {
-        slog("graphics: d3d9.dll in the game folder is not a graphics wrapper (ASI loader / DXVK?) - dxgi.dll (%s) left alone", w2);
-        return;
-    }
+    k9 = gx_kind(d3d9);
+    if (k9) slog("graphics: d3d9.dll in the game folder: %s", k9[0] ? k9 : "not a known graphics tool (ASI loader?)");
+    kx = gx_kind(dxgi);
+    if (!kx) return;
+    if (!kx[0]) { slog("graphics: dxgi.dll in the game folder is not a known graphics tool - left alone"); return; }
+    if (s_ieq(kx, "DXVK")) { slog("graphics: dxgi.dll in the game folder is DXVK - left alone"); return; }
     if (!g_cfgOneWrapper) {
-        slog("graphics: TWO wrappers in the game folder - d3d9.dll (%s) and dxgi.dll (%s). Two ReShades crash the game. "
-             "[Graphics] OneWrapper=0: both are used", w1, w2);
+        slog("graphics: dxgi.dll in the game folder is %s - a Direct3D 10/11 tool inside this Direct3D 9 game%s. "
+             "[Graphics] OneWrapper=0: it is used", kx, k9 && k9[0] ? " (next to the d3d9.dll one)" : "");
         return;
     }
     m = GetModuleHandleA("dxgi.dll");
     if (m) {
         have[0] = 0; GetModuleFileNameA(m, have, MAX_PATH);
-        if (s_ieq(have, dxgi)) slog("graphics: TWO wrappers - d3d9.dll (%s) and dxgi.dll (%s); dxgi.dll was already loaded before SLAM could keep it out. Move dxgi.dll out of the game folder", w1, w2);
-        else slog("graphics: two wrappers in the game folder, but Windows' dxgi.dll is already in use (%s) - the game folder's dxgi.dll will not load", have);
+        if (s_ieq(have, dxgi)) slog("graphics: dxgi.dll (%s) was already loaded before SLAM could keep it out. Move dxgi.dll out of the game folder", kx);
+        else slog("graphics: dxgi.dll in the game folder (%s) will not load - Windows' dxgi.dll is already in use (%s)", kx, have);
         return;
     }
     GetSystemDirectoryA(sys, MAX_PATH); s_cat(sys, "\\dxgi.dll", MAX_PATH);
     m = LoadLibraryA(sys);
-    if (m) slog("graphics: TWO wrappers in the game folder - d3d9.dll (%s) and dxgi.dll (%s). Two ReShades crash the game: "
-                "kept d3d9.dll (made for Direct3D 9 games like NBA 2K14); the game folder's dxgi.dll is NOT used "
-                "(Windows' own dxgi.dll was loaded in its place). Nothing was moved or deleted. [Graphics] OneWrapper=0 = use both", w1, w2);
-    else slog("graphics: TWO wrappers (d3d9.dll %s, dxgi.dll %s) - Windows' dxgi.dll could not be loaded (%s), both stay. Move dxgi.dll out of the game folder", w1, w2, sys);
+    if (m) slog("graphics: dxgi.dll in the game folder is %s - NBA 2K14 is Direct3D 9 and never needs it, but Windows' d3d9 "
+                "would load it into Direct3D 9 (crash / no window). It is NOT used: Windows' own dxgi.dll was loaded in its place. "
+                "Nothing was moved or deleted; d3d9.dll%s%s%s works as usual. [Graphics] OneWrapper=0 = use it anyway", kx,
+                k9 && k9[0] ? " (" : "", k9 && k9[0] ? k9 : "", k9 && k9[0] ? ")" : "");
+    else slog("graphics: dxgi.dll in the game folder is %s - Windows' dxgi.dll could not be loaded (%s), it stays. Move dxgi.dll out of the game folder", kx, sys);
 }
 
 /* at game ready: which dxgi.dll is really in use (for the log) */
