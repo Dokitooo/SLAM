@@ -10,6 +10,10 @@
   as without SLAM. Nothing is moved or deleted; DXVK and unknown files are left alone. `[Graphics] OneWrapper=0`
   = off.
 - `SLAM.log` names what is in the game folder ("graphics: d3d9.dll in the game folder: SweetFX ...").
+- **The mod list shows with SweetFX too.** With SweetFX's `d3d9.dll` the mod list at start did not appear. SLAM now
+  draws it through every Present the game's devices use and through the swap chain's Present (once per frame; all
+  SLAM Direct3D hooks are still removed after the list). `SLAM.log` says how far the list got ("overlay: Direct3D 9
+  created", "overlay: device made ...", "overlay: mod list shown ...").
 - Includes 1.1.2 (report with `[memory]`). Mods need no update.
 
 ## 1.1.2

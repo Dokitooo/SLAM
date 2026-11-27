@@ -24,13 +24,21 @@ typedef char ov_check_createdev[(sizeof(void *) * 16 == offsetof(IDirect3D9Vtbl,
 
 static int g_ovShow = 1, g_ovMs = 3000;
 static volatile LONG g_ovDone;                  /* list shown (or given up): hooks removed */
-static void *g_ovD3DCreate, *g_ovCreateDev, *g_ovPresent;   /* hooked functions */
+static void *g_ovD3DCreate, *g_ovCreateDev;   /* hooked functions */
 typedef IDirect3D9 *(WINAPI *D3DCreate9_t)(UINT);
 typedef HRESULT (WINAPI *CreateDevice_t)(IDirect3D9 *, UINT, D3DDEVTYPE, HWND, DWORD, D3DPRESENT_PARAMETERS *, IDirect3DDevice9 **);
 typedef HRESULT (WINAPI *Present_t)(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
 static D3DCreate9_t o_D3DCreate9;
 static CreateDevice_t o_CreateDevice;
-static Present_t o_Present;
+/* 1.1.4: every distinct Present function (devices made with other flags / by a wrapper like SweetFX can use another
+ * one - with SweetFX's injector the mod list never showed) plus the swap chain's Present; g_ovIn: drawn once per frame */
+#define OV_MAXP 4
+typedef HRESULT (WINAPI *SCPresent_t)(IDirect3DSwapChain9 *, const RECT *, const RECT *, HWND, const RGNDATA *, DWORD);
+static void *g_ovPFn[OV_MAXP], *g_ovSCFn;
+static Present_t o_P[OV_MAXP];
+static SCPresent_t o_SCP;
+static int g_ovNP;
+static volatile LONG g_ovIn, g_ovBuilt;
 
 static void overlay_config(const char *ini)
 {
@@ -222,47 +230,89 @@ static void ov_draw(IDirect3DDevice9 *dev)
     IDirect3DSurface9_Release(bb);
 }
 
-static HRESULT WINAPI ov_Present(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
 static HRESULT WINAPI ov_CreateDevice(IDirect3D9 *, UINT, D3DDEVTYPE, HWND, DWORD, D3DPRESENT_PARAMETERS *, IDirect3DDevice9 **);
 static IDirect3D9 *WINAPI ov_D3DCreate9(UINT);
+
+static HRESULT WINAPI ov_P0(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
+static HRESULT WINAPI ov_P1(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
+static HRESULT WINAPI ov_P2(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
+static HRESULT WINAPI ov_P3(IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
+static HRESULT WINAPI ov_SCP(IDirect3DSwapChain9 *, const RECT *, const RECT *, HWND, const RGNDATA *, DWORD);
+static void *const g_ovPThunk[OV_MAXP] = { (void *)ov_P0, (void *)ov_P1, (void *)ov_P2, (void *)ov_P3 };
 
 /* list shown: take every SLAM hook out of Direct3D again */
 static void ov_finish(void)
 {
+    int i;
     if (InterlockedExchange(&g_ovDone, 2) == 2) return;
-    if (g_ovPresent) hook_remove(&g_core, g_ovPresent, (void *)ov_Present);
+    for (i = 0; i < g_ovNP; i++) hook_remove(&g_core, g_ovPFn[i], g_ovPThunk[i]);
+    if (g_ovSCFn) hook_remove(&g_core, g_ovSCFn, (void *)ov_SCP);
     if (g_ovCreateDev) hook_remove(&g_core, g_ovCreateDev, (void *)ov_CreateDevice);
     if (g_ovD3DCreate) hook_remove(&g_core, g_ovD3DCreate, (void *)ov_D3DCreate9);
     slog("overlay: mod list shown for %d s - SLAM's Direct3D hooks removed", g_ovMs / 1000);
 }
 
-/* ---- the three hooks -------------------------------------------------------------------------- */
-static HRESULT WINAPI ov_Present(IDirect3DDevice9 *dev, const RECT *a, const RECT *b, HWND w, const RGNDATA *r)
+/* ---- the hooks -------------------------------------------------------------------------------- */
+static void ov_frame(IDirect3DDevice9 *dev)                /* once per frame, before the real Present */
 {
-    if (!g_ovDone) {
-        ov_draw(dev);
-        if (g_ovTex && GetTickCount() - g_ovT0 >= (DWORD)g_ovMs) {
-            IDirect3DTexture9_Release(g_ovTex); g_ovTex = 0;
-            InterlockedExchange(&g_ovDone, 1);
-        }
+    if (g_ovDone || g_ovIn) return;
+    ov_draw(dev);
+    if (g_ovTex && GetTickCount() - g_ovT0 >= (DWORD)g_ovMs) {
+        IDirect3DTexture9_Release(g_ovTex); g_ovTex = 0;
+        InterlockedExchange(&g_ovDone, 1);
     }
-    {
-        HRESULT hr = o_Present(dev, a, b, w, r);
-        if (g_ovDone == 1) ov_finish();
-        return hr;
+}
+static HRESULT ov_pres(int i, IDirect3DDevice9 *dev, const RECT *a, const RECT *b, HWND w, const RGNDATA *r)
+{
+    HRESULT hr;
+    ov_frame(dev);
+    InterlockedIncrement(&g_ovIn);
+    hr = o_P[i](dev, a, b, w, r);
+    InterlockedDecrement(&g_ovIn);
+    if (g_ovDone == 1 && !g_ovIn) ov_finish();
+    return hr;
+}
+static HRESULT WINAPI ov_P0(IDirect3DDevice9 *d, const RECT *a, const RECT *b, HWND w, const RGNDATA *r) { return ov_pres(0, d, a, b, w, r); }
+static HRESULT WINAPI ov_P1(IDirect3DDevice9 *d, const RECT *a, const RECT *b, HWND w, const RGNDATA *r) { return ov_pres(1, d, a, b, w, r); }
+static HRESULT WINAPI ov_P2(IDirect3DDevice9 *d, const RECT *a, const RECT *b, HWND w, const RGNDATA *r) { return ov_pres(2, d, a, b, w, r); }
+static HRESULT WINAPI ov_P3(IDirect3DDevice9 *d, const RECT *a, const RECT *b, HWND w, const RGNDATA *r) { return ov_pres(3, d, a, b, w, r); }
+static HRESULT WINAPI ov_SCP(IDirect3DSwapChain9 *sc, const RECT *a, const RECT *b, HWND w, const RGNDATA *r, DWORD f)
+{
+    HRESULT hr;
+    if (!g_ovDone && !g_ovIn) {
+        IDirect3DDevice9 *dev = 0;
+        if (SUCCEEDED(IDirect3DSwapChain9_GetDevice(sc, &dev)) && dev) { ov_frame(dev); IDirect3DDevice9_Release(dev); }
     }
+    InterlockedIncrement(&g_ovIn);
+    hr = o_SCP(sc, a, b, w, r, f);
+    InterlockedDecrement(&g_ovIn);
+    if (g_ovDone == 1 && !g_ovIn) ov_finish();
+    return hr;
 }
 
 static HRESULT WINAPI ov_CreateDevice(IDirect3D9 *d3d, UINT ad, D3DDEVTYPE t, HWND w, DWORD f, D3DPRESENT_PARAMETERS *pp, IDirect3DDevice9 **out)
 {
     HRESULT hr = o_CreateDevice(d3d, ad, t, w, f, pp, out);
-    if (SUCCEEDED(hr) && out && *out && !g_ovPresent && !g_ovDone) {
-        void *fn = ((void **)*(void **)*out)[17];           /* IDirect3DDevice9::Present */
+    if (SUCCEEDED(hr) && out && *out && !g_ovDone) {
+        void *fn = ((void **)*(void **)*out)[17];           /* IDirect3DDevice9::Present of THIS device */
+        IDirect3DSwapChain9 *sc = 0;
+        int i, have = 0;
         EnterCriticalSection(&g_hookLock);
-        ov_build_list();
+        if (!g_ovBuilt) { ov_build_list(); g_ovBuilt = 1; slog("overlay: device made (%ux%u)", pp ? pp->BackBufferWidth : 0, pp ? pp->BackBufferHeight : 0); }
+        for (i = 0; i < g_ovNP; i++) if (g_ovPFn[i] == fn) have = 1;
+        if (!have && g_ovNP < OV_MAXP) {
+            if (hook_add(&g_core, fn, g_ovPThunk[g_ovNP], (void **)&o_P[g_ovNP]) == SLAM_OK) {
+                g_ovPFn[g_ovNP++] = fn;
+                if (g_ovNP > 1) slog("overlay: this device has another Present (%d) - hooked too", g_ovNP);
+            } else if (!g_ovNP) slog("overlay: Present could not be hooked");
+        }
+        if (!g_ovSCFn && SUCCEEDED(IDirect3DDevice9_GetSwapChain(*out, 0, &sc)) && sc) {   /* the swap chain's Present too */
+            void *sfn = ((void **)*(void **)sc)[3];
+            if (hook_add(&g_core, sfn, (void *)ov_SCP, (void **)&o_SCP) == SLAM_OK) g_ovSCFn = sfn;
+            IDirect3DSwapChain9_Release(sc);
+        }
+        if (!g_ovNP && !g_ovSCFn) { slog("overlay: Present could not be hooked - no mod list"); InterlockedExchange(&g_ovDone, 1); }
         LeaveCriticalSection(&g_hookLock);
-        if (hook_add(&g_core, fn, (void *)ov_Present, (void **)&o_Present) == SLAM_OK) g_ovPresent = fn;
-        else { slog("overlay: Present could not be hooked - no mod list"); InterlockedExchange(&g_ovDone, 1); }
     }
     return hr;
 }
@@ -271,6 +321,7 @@ static IDirect3D9 *WINAPI ov_D3DCreate9(UINT sdk)
 {
     IDirect3D9 *d = o_D3DCreate9(sdk);
     if (d && !g_ovCreateDev && !g_ovDone) {
+        slog("overlay: Direct3D 9 created - waiting for the device");
         void *fn = ((void **)*(void **)d)[16];              /* IDirect3D9::CreateDevice */
         if (hook_add(&g_core, fn, (void *)ov_CreateDevice, (void **)&o_CreateDevice) == SLAM_OK) g_ovCreateDev = fn;
     }
